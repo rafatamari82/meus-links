@@ -1,0 +1,48 @@
+/* gerado de replica/design/tokens.json */
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #f5f7f6;
+  --color-border: #e1e6e4;
+  --color-border-input: #7c8784;
+  --color-text: #121a18;
+  --color-text-muted: #55615d;
+  --color-accent: #0f6b5c;
+  --color-accent-hover: #0b5648;
+  --color-accent-soft: #e3f1ee;
+  --color-on-accent: #ffffff;
+  --color-danger: #b42828;
+  --color-danger-soft: #fbe9e9;
+  --color-success: #1c6e45;
+  --color-warning: #8a5a00;
+  --color-warning-soft: #fdf3dc;
+  --font-sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 12px; --leading-xs: 16px; --weight-xs: 500;
+  --text-sm: 14px; --leading-sm: 20px; --weight-sm: 400;
+  --text-base: 16px; --leading-base: 24px; --weight-base: 400;
+  --text-lg: 20px; --leading-lg: 28px; --weight-lg: 600;
+  --text-xl: 28px; --leading-xl: 34px; --weight-xl: 700;
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(16,24,20,.06), 0 1px 3px rgba(16,24,20,.10);
+  --shadow-pop: 0 12px 32px rgba(16,24,20,.18);
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-ease: cubic-bezier(.2,.8,.2,1);
+  --layout-sidebar: 232px;
+  --layout-content-max: 1120px;
+  --layout-header: 56px;
+  --layout-drawer: 440px;
+  --layout-bp-mobile: 760px;
+}

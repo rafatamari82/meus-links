@@ -1,0 +1,38 @@
+feature,area,priority,original,clone,notes
+Sign up and log in with email,onboarding,must,yes,yes,
+Create a short link (destination + domain + back-half),links,must,yes,yes,core loop
+Random back-half when none is given,links,must,yes,yes,
+Custom back-half with uniqueness check per domain,links,must,yes,yes,up to 50 chars
+Redirect short link to destination,redirect,must,yes,yes,the product itself
+Count clicks per link,analytics,must,yes,yes,
+Links list with search,links,must,yes,yes,
+Copy short link in one click,links,must,yes,yes,
+Edit destination after publishing,links,must,yes,yes,UNLIMITED edits (original caps edits per plan) - owner requirement
+Delete a link,links,must,yes,yes,
+Connect a custom domain via DNS,domains,must,yes,yes,
+Automatic HTTPS on custom domains,domains,must,yes,partial,Cloudflare Workers Custom Domains issue DNS + cert; confirm on first real deploy
+Service domain for users without their own,domains,must,yes,yes,the app host doubles as the default short domain
+Link stats: clicks over time,analytics,should,yes,yes,
+Link stats: country device referrer,analytics,should,yes,partial,referrer only; country/device not yet
+Bot and link-preview filtering,analytics,should,yes,yes,
+Tags on links and filter by tag,organization,should,yes,no,
+Favourite links,organization,should,yes,no,
+QR code per link (PNG and SVG),qr,should,yes,no,
+QR scans counted separately,analytics,should,yes,no,
+UTM builder on the destination,links,should,yes,yes,
+Forward query parameters to destination,redirect,should,yes,yes,
+404 fallback URL per domain,domains,should,yes,yes,
+Social preview (title description image),links,should,yes,no,
+Password-protected links,links,could,yes,no,
+Link expiration,links,could,yes,no,
+Bulk import from CSV,links,could,yes,no,
+Export links to CSV,links,could,yes,no,
+UTM presets,links,could,yes,no,
+Public API with API keys,api,could,yes,no,
+Workspaces and teammates,team,could,yes,skip,personal use: one owner
+Traffic routing by device or country,redirect,could,yes,no,
+Buy a domain inside the app,domains,could,yes,skip,needs a registrar partnership
+Their rebrand.ly service domain,domains,could,yes,skip,owned by them; use your own
+Third-party integrations marketplace,integrations,could,yes,skip,their partner apps
+AI back-half suggestions and best time to post,ai,could,yes,skip,product layer outside the loop
+Enterprise SSO,team,could,yes,skip,not needed for the core loop

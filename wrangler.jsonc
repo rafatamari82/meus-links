@@ -1,0 +1,15 @@
+{
+  // Cloudflare Workers config. The D1 database below is created automatically
+  // on the first deploy (no ID needed).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "meus-links",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "meus-links" }
+  ]
+  // Optional: to open the panel on your own domain instead of *.workers.dev,
+  // add  "vars": { "APP_HOST": "links.seudominio.com" }  and connect that domain too.
+}
