@@ -55,20 +55,20 @@ function flashes(c) {
 }
 
 export function page(c, title, body) {
-  const nav = (href, label, active) =>
-    html`<a href="${href}" class="nav-item ${active ? "is-current" : ""}" ${active ? raw('aria-current="page"') : ""}>${label}</a>`;
+  const nav = (href, label, active, icon) =>
+    html`<a href="${href}" class="nav-item ${active ? "is-current" : ""}" ${active ? raw('aria-current="page"') : ""}>${icon || ""}<span>${label}</span></a>`;
   return html`${head(title, c.assetVersion)}
 <body class="panel">
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
     <a class="brand" href="/results">${ICON}<span>Cutti</span></a>
-    <nav>${nav("/results", "Resultados", c.section === "results")}${nav("/sales", "Vendas", c.section === "sales")}${nav("/links", "Encurtador de Link", c.section === "links")}${nav("/tracking", "Trackeamento", c.section === "tracking")}${nav("/integrations", "Avisos e moeda", c.section === "integrations")}${nav("/domains", "Domínios", c.section === "domains")}${nav("/settings", "Ajustes", c.section === "settings")}</nav>
+    <nav>${nav("/results", "Resumo", c.section === "results", TAB_ICONS.home)}${nav("/sales", "Vendas", c.section === "sales", TAB_ICONS.list)}${nav("/links", "Encurtador de Link", c.section === "links", TAB_ICONS.link)}${nav("/tracking", "Trackeamento", c.section === "tracking", TAB_ICONS.target)}${nav("/integrations", "Avisos e moeda", c.section === "integrations", TAB_ICONS.bell)}${nav("/domains", "Domínios", c.section === "domains", TAB_ICONS.globe)}${nav("/settings", "Ajustes", c.section === "settings", TAB_ICONS.gear)}</nav>
     <form method="post" action="/logout" class="sidebar-foot">${csrfField(c)}<button class="btn btn-ghost btn-sm" type="submit">Sair</button></form>
   </aside>
   <main class="main" id="main">${flashes(c)}${body}</main>
 </div>
 <nav class="tabbar" aria-label="Navegação principal">
-  ${tabItem("/results", "Início", TAB_ICONS.home, c.section === "results")}
+  ${tabItem("/results", "Resumo", TAB_ICONS.home, c.section === "results")}
   ${tabItem("/sales", "Vendas", TAB_ICONS.list, c.section === "sales")}
   ${tabItem("/links", "Links", TAB_ICONS.link, c.section === "links")}
   ${tabItem("/tracking", "Trackeamento", TAB_ICONS.target, c.section === "tracking")}
@@ -85,6 +85,8 @@ const TAB_ICONS = {
   list: svg('<path d="M9 7h11M9 12h11M9 17h11"/><circle cx="4.5" cy="7" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="17" r="1"/>'),
   link: svg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
   target: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'),
+  bell: svg('<path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>'),
+  globe: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
   gear: svg('<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>'),
 };
 function tabItem(href, label, icon, active) {

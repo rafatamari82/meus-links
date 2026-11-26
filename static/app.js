@@ -60,6 +60,8 @@
       var box2 = e.target.form.querySelector(".range-custom");
       if (box2) box2.hidden = e.target.value !== "custom";
       if (e.target.value !== "custom") e.target.form.submit();
+    } else if (e.target.matches("[data-autosubmit-select]")) {
+      e.target.form.submit();
     }
     if (e.target.matches("input[name=geo_countries]")) {
       var box = e.target.closest(".geo-picker");

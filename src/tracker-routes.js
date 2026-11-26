@@ -495,18 +495,24 @@ export async function resultsPage(c) {
   const range = readRange(c.url.searchParams);
   const byAd = c.url.searchParams.get("by") === "ad";
   const srcFilter = c.url.searchParams.get("source") || "";
+  const netFilter = T.NETWORKS[c.url.searchParams.get("network")] ? c.url.searchParams.get("network") : "";
+  const prodFilter = String(c.url.searchParams.get("product") || "").slice(0, 160);
+  // Network and product narrow the sales; clicks follow the link's network; ad cost is per campaign and is not split.
+  const vSql = `${netFilter ? " and v.network = ?" : ""}${prodFilter ? " and v.product = ?" : ""}`;
+  const vArgs = [...(netFilter ? [netFilter] : []), ...(prodFilter ? [prodFilter] : [])];
   const db = c.db;
   const adCol = byAd ? ", coalesce(ad, '') as ad" : ", '' as ad";
   const adGroup = byAd ? ", ad" : "";
   const clicks = (await db.prepare(
-    `select source, coalesce(campaign, '') as campaign${adCol}, count(*) as n from tk_clicks where at >= ? and at < ? group by source, campaign${adGroup}`,
-  ).bind(range.start, range.end).all()).results;
+    `select source, coalesce(campaign, '') as campaign${adCol}, count(*) as n from tk_clicks
+     where at >= ? and at < ?${netFilter ? " and link_id in (select id from links where network = ?)" : ""} group by source, campaign${adGroup}`,
+  ).bind(range.start, range.end, ...(netFilter ? [netFilter] : [])).all()).results;
   const convs = (await db.prepare(
     `select coalesce(k.source, 'none') as source, coalesce(k.campaign, '') as campaign${byAd ? ", coalesce(k.ad, '') as ad" : ", '' as ad"},
             v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
      from tk_conversions v left join tk_clicks k on k.id = v.click_id
-     where v.at >= ? and v.at < ? group by 1, 2, 3, v.type, v.currency`,
-  ).bind(range.start, range.end).all()).results;
+     where v.at >= ? and v.at < ?${vSql} group by 1, 2, 3, v.type, v.currency`,
+  ).bind(range.start, range.end, ...vArgs).all()).results;
   const costs = (await db.prepare(
     "select source, campaign_key as campaign, currency, sum(cost_cents) as cents, sum(clicks) as clicks from tk_costs where date >= ? and date <= ? group by source, campaign_key, currency",
   ).bind(range.from, range.to).all()).results;
@@ -563,8 +569,8 @@ export async function resultsPage(c) {
   const srcSql = srcFilter ? " and coalesce(k.source, 'none') = ?" : "";
   const dRows = (await db.prepare(
     `select substr(datetime(v.at, '-${SP_OFFSET_H} hours'), 1, 10) as d, v.type, v.currency, sum(v.amount_cents) as cents
-     from tk_conversions v left join tk_clicks k on k.id = v.click_id where v.at >= ? and v.at < ?${srcSql} group by 1, 2, 3`,
-  ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : [])).all()).results;
+     from tk_conversions v left join tk_clicks k on k.id = v.click_id where v.at >= ? and v.at < ?${srcSql}${vSql} group by 1, 2, 3`,
+  ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs).all()).results;
   for (const r of dRows) if (r.d in dayRev) dayRev[r.d] += sumRev(r.type, conv(r.cents, r.currency));
   const cRows = (await db.prepare(
     `select date as d, currency, sum(cost_cents) as cents from tk_costs where date >= ? and date <= ?${srcFilter ? " and source = ?" : ""} group by 1, 2`,
@@ -577,8 +583,8 @@ export async function resultsPage(c) {
   const netRows = (await db.prepare(
     `select v.network, v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
      from tk_conversions v left join tk_clicks k on k.id = v.click_id
-     where v.at >= ? and v.at < ?${srcSql} group by v.network, v.type, v.currency`,
-  ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : [])).all()).results;
+     where v.at >= ? and v.at < ?${srcSql}${vSql} group by v.network, v.type, v.currency`,
+  ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs).all()).results;
   const nets = new Map();
   for (const r of (await db.prepare("select distinct network from links where track = 1 and network is not null").all()).results) {
     nets.set(r.network, { network: r.network, revenue: 0, sales: 0, refunds: 0 });
@@ -589,10 +595,30 @@ export async function resultsPage(c) {
     if (r.type === "sale" || r.type === "upsell") x.sales += r.n; else x.refunds += r.n;
     x.revenue += sumRev(r.type, conv(r.cents, r.currency));
   }
-  const networks = [...nets.values()].sort((a, b) => b.revenue - a.revenue || b.sales - a.sales);
+  const networks = [...nets.values()].filter((n) => !netFilter || n.network === netFilter).sort((a, b) => b.revenue - a.revenue || b.sales - a.sales);
+
+  // Per product, plus money totals for refunds and chargebacks.
+  const pRows = (await db.prepare(
+    `select coalesce(v.product, '') as product, v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
+     from tk_conversions v left join tk_clicks k on k.id = v.click_id
+     where v.at >= ? and v.at < ?${srcSql}${vSql} group by 1, v.type, v.currency`,
+  ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs).all()).results;
+  const prods = new Map();
+  const money = { gross: 0, refunded: 0, charged: 0, refundN: 0, chargeN: 0 };
+  for (const r of pRows) {
+    const v = conv(r.cents, r.currency);
+    if (!prods.has(r.product)) prods.set(r.product, { product: r.product, sales: 0, revenue: 0 });
+    const x = prods.get(r.product);
+    if (r.type === "sale" || r.type === "upsell") { x.sales += r.n; money.gross += v; }
+    else if (r.type === "refund") { money.refunded += v; money.refundN += r.n; }
+    else { money.charged += v; money.chargeN += r.n; }
+    x.revenue += sumRev(r.type, v);
+  }
+  const products = [...prods.values()].sort((a, b) => b.revenue - a.revenue);
+  const productNames = (await db.prepare("select distinct product from tk_conversions where product is not null order by product limit 200").all()).results.map((r) => r.product);
   const sources = (await db.prepare("select distinct source from tk_clicks").all()).results.map((r) => r.source);
   if (srcFilter && !sources.includes(srcFilter)) sources.push(srcFilter);
-  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, list, tot, series, hasAny, sources, networks }));
+  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, netFilter, prodFilter, list, tot, series, hasAny, sources, networks, products, productNames, money }));
 }
 
 export async function salesPage(c) {

@@ -54,11 +54,11 @@ function chart(series, cur) {
 <tbody>${series.map((x) => html`<tr><th scope="row">${ddmm(x.d)}</th><td>${fmtMoney(x.rev, cur)}</td><td>${fmtMoney(x.cost, cur)}</td></tr>`)}</tbody></table>`;
 }
 
-export function resultsView(c, { s, range, byAd, srcFilter, list, tot, series, hasAny, sources = [], networks = [] }) {
+export function resultsView(c, { s, range, byAd, srcFilter, netFilter = "", prodFilter = "", list, tot, series, hasAny, sources = [], networks = [], products = [], productNames = [], money = {} }) {
   const cur = s.currency;
   const m = (x) => (x == null ? "—" : fmtMoney(x, cur));
   const tab = (label, params, on) => html`<a class="tab ${on ? "is-current" : ""}" href="/results?${new URLSearchParams(params)}" ${on ? raw('aria-current="page"') : ""}>${label}</a>`;
-  const base = { p: range.preset, ...(range.preset === "custom" ? { from: range.from, to: range.to } : {}) };
+  const base = { p: range.preset, ...(range.preset === "custom" ? { from: range.from, to: range.to } : {}), ...(netFilter ? { network: netFilter } : {}), ...(prodFilter ? { product: prodFilter } : {}) };
   const withBy = byAd ? { by: "ad" } : {};
   const withSrc = srcFilter ? { source: srcFilter } : {};
   const empty = !hasAny ? html`
@@ -67,35 +67,88 @@ export function resultsView(c, { s, range, byAd, srcFilter, list, tot, series, h
   <p class="muted">1. Em um link, abra “Rastrear vendas” e escolha a rede. 2. Cole a URL de postback na rede (aba Integrações). 3. Use o link no anúncio com o modelo de rastreamento do Google Ads ou da NewsBreak.</p>
   <a class="btn btn-primary" href="/integrations">Abrir Integrações</a>
 </div>` : "";
-  return page({ ...c, section: "results" }, "Resultados", html`
+  const opt = (v, l, cur2) => html`<option value="${v}" ${v === cur2 ? raw("selected") : ""}>${l}</option>`;
+  const srcOpts = ["google", "newsbreak", ...sources.filter((x) => !["google", "newsbreak", "none"].includes(x))];
+  const roi = tot.cost ? tot.profit / tot.cost : null;
+  const margin = tot.revenue > 0 ? tot.profit / tot.revenue : null;
+  const ticket = tot.sales ? Math.round((money.gross || 0) / tot.sales) : null;
+  const card = (label, value, hint, tone = "") => html`<div class="mcard">
+    <p class="mcard-label">${label}${hint ? html` <span class="info" title="${hint}" aria-label="${hint}">i</span>` : ""}</p>
+    <p class="mcard-value ${tone}">${value}</p></div>`;
+  const pctTxt = (x) => (x == null ? "—" : `${(x * 100).toFixed(1).replace(".", ",")}%`);
+  const tone = (x) => (x == null ? "" : x < 0 ? "neg" : x > 0 ? "pos" : "");
+  const maxProd = Math.max(1, ...products.map((x) => Math.abs(x.revenue)));
+  const maxNet = Math.max(1, ...networks.map((x) => Math.abs(x.revenue)));
+  return page({ ...c, section: "results" }, "Resumo", html`
 <header class="page-head dash-head">
-  <div><h1 class="h-xl">${RANGE_LABEL[range.preset] || `${ddmm(range.from)} a ${ddmm(range.to)}`}</h1><p class="muted">Valores em ${cur}${srcFilter ? ` · ${SOURCE_LABEL[srcFilter] || srcFilter}` : ""}</p></div>
-  ${rangeForm(range, { ...withBy, ...withSrc })}
+  <div><h1 class="h-xl">Resumo</h1><p class="muted">${RANGE_LABEL[range.preset] || `${ddmm(range.from)} a ${ddmm(range.to)}`} · valores em ${cur}${s.rate_at ? ` · dólar R$ ${Number(s.usd_brl).toFixed(2).replace(".", ",")}` : ""}</p></div>
+  <a class="btn btn-primary" href="/results?${new URLSearchParams({ ...base, ...(srcFilter ? { source: srcFilter } : {}), ...(byAd ? { by: "ad" } : {}) })}">Atualizar</a>
 </header>
 ${empty}
-<div class="kpis">
-  <div class="kpi kpi-hero"><p class="kpi-label">Faturamento</p><p class="kpi-value">${m(tot.revenue)}</p></div>
-  <div class="kpi kpi-dark"><p class="kpi-label">Vendas</p><p class="kpi-value">${tot.sales}</p></div>
-  <div class="kpi kpi-outline"><p class="kpi-label">Reembolsos</p><p class="kpi-value">${tot.refunds}</p></div>
+<form class="card pad dash-filters" method="get" data-range>
+  ${byAd ? html`<input type="hidden" name="by" value="ad">` : ""}
+  <div class="field"><label for="p">Período</label>
+    <select id="p" name="p" data-range-preset data-autosubmit-select>
+      ${opt("today", "Hoje", range.preset)}${opt("yesterday", "Ontem", range.preset)}${opt("7d", "Últimos 7 dias", range.preset)}${opt("30d", "Últimos 30 dias", range.preset)}${opt("month", "Este mês", range.preset)}${opt("custom", "Escolher datas", range.preset)}
+    </select>
+    <span class="range-custom" ${range.preset === "custom" ? "" : raw("hidden")}>
+      <label class="sr-only" for="from">De</label><input id="from" name="from" type="date" value="${range.from}">
+      <label class="sr-only" for="to">Até</label><input id="to" name="to" type="date" value="${range.to}">
+      <button class="btn btn-secondary btn-sm" type="submit">Ver</button>
+    </span></div>
+  <div class="field"><label for="f-source">Fonte de tráfego</label>
+    <select id="f-source" name="source" data-autosubmit-select>${opt("", "Todas", srcFilter)}${srcOpts.map((x) => opt(x, SOURCE_LABEL[x] || x, srcFilter))}${opt("none", "Sem rastreio", srcFilter)}</select></div>
+  <div class="field"><label for="f-network">Plataforma</label>
+    <select id="f-network" name="network" data-autosubmit-select>${opt("", "Todas", netFilter)}${Object.entries(NETWORKS).filter(([k]) => k !== "other").map(([k, n]) => opt(k, n.name, netFilter))}</select></div>
+  <div class="field"><label for="f-product">Produto</label>
+    <select id="f-product" name="product" data-autosubmit-select>${opt("", "Todos", prodFilter)}${productNames.map((x) => opt(x, x, prodFilter))}</select></div>
+  <noscript><button class="btn btn-secondary" type="submit">Filtrar</button></noscript>
+</form>
+
+<div class="mgrid mgrid-main">
+  <div class="mcard mcard-hero"><p class="mcard-label">Faturamento líquido</p><p class="mcard-value">${m(tot.revenue)}</p><p class="mcard-sub">${tot.sales} ${tot.sales === 1 ? "venda" : "vendas"}${tot.refunds ? ` · ${tot.refunds} reembolso(s)` : ""}</p></div>
+  ${card("Gastos com anúncios", m(tot.cost), netFilter || prodFilter ? "O gasto é por campanha e não é dividido por plataforma ou produto." : "Soma do gasto das campanhas no período.")}
+  ${card("ROAS", ratio(tot.roas), "Faturamento líquido dividido pelo gasto.")}
+  ${card("Lucro", m(tot.profit), "Faturamento líquido menos o gasto.", tone(tot.profit))}
 </div>
-<div class="kpis-mini">
-  <div class="kpi-mini"><p class="kpi-label">Gasto</p><p>${m(tot.cost)}</p></div>
-  <div class="kpi-mini"><p class="kpi-label">Lucro</p><p class="${tot.profit < 0 ? "neg" : tot.profit > 0 ? "pos" : ""}">${m(tot.profit)}</p></div>
-  <div class="kpi-mini"><p class="kpi-label">ROAS</p><p>${ratio(tot.roas)}</p></div>
-  <div class="kpi-mini"><p class="kpi-label">CPA</p><p>${m(tot.cpa)}</p></div>
-  <div class="kpi-mini"><p class="kpi-label">Cliques</p><p>${tot.clicks}</p></div>
-  <div class="kpi-mini"><p class="kpi-label">Conversão</p><p>${pct(tot.trackedSales, tot.clicks)}</p></div>
+
+<div class="dash-split">
+  <div class="dash-side">
+    <section class="card pad">
+      <h2 class="h-md">Vendas por produto</h2>
+      ${products.length ? html`<ul class="rank">${products.map((x) => html`<li>
+        <a href="/results?${new URLSearchParams({ ...base, product: x.product, ...(srcFilter ? { source: srcFilter } : {}) })}" class="rank-row">
+          <span class="rank-name">${x.product || "Sem nome do produto"}</span><span class="rank-val">${m(x.revenue)}</span></a>
+        <svg class="rank-bar" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="6" rx="3" class="rank-bg"/><rect width="${Math.max(2, Math.round((Math.abs(x.revenue) / maxProd) * 100))}" height="6" rx="3" class="rank-fg"/></svg>
+        <span class="hint">${x.sales} ${x.sales === 1 ? "venda" : "vendas"}</span></li>`)}</ul>`
+    : html`<p class="muted">Nenhuma venda por aqui.</p>`}
+    </section>
+    <section class="card pad">
+      <h2 class="h-md">Vendas por plataforma</h2>
+      ${networks.some((n) => n.sales || n.refunds) ? html`<ul class="rank">${networks.filter((n) => n.sales || n.refunds).map((n) => html`<li>
+        <a href="/sales?${new URLSearchParams({ ...base, network: n.network })}" class="rank-row">
+          <span class="rank-name">${NETWORKS[n.network]?.name || n.network}</span><span class="rank-val">${m(n.revenue)}</span></a>
+        <svg class="rank-bar" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="6" rx="3" class="rank-bg"/><rect width="${Math.max(2, Math.round((Math.abs(n.revenue) / maxNet) * 100))}" height="6" rx="3" class="rank-fg"/></svg>
+        <span class="hint">${n.sales} ${n.sales === 1 ? "venda" : "vendas"} · ${n.refunds} reembolso(s)</span></li>`)}</ul>`
+    : html`<p class="muted">Nenhuma venda por aqui.</p>`}
+    </section>
+  </div>
+  <div class="mgrid mgrid-sec">
+    ${card("Vendas", String(tot.sales), "Vendas e upsells aprovados no período.")}
+    ${card("Ticket médio", m(ticket), "Valor médio de cada venda, antes de reembolsos.")}
+    ${card("CPA", m(tot.cpa), "Gasto dividido pelo número de vendas.")}
+    ${card("ROI", pctTxt(roi), "Lucro dividido pelo gasto.", tone(roi))}
+    ${card("Margem", pctTxt(margin), "Lucro dividido pelo faturamento líquido.", tone(margin))}
+    ${card("Cliques", String(tot.clicks), "Cliques nos links rastreados.")}
+    ${card("Conversão", pct(tot.trackedSales, tot.clicks), "Vendas rastreadas divididas pelos cliques.")}
+    ${card("Vendas reembolsadas", m(money.refunded || 0), "Valor devolvido em reembolsos no período.")}
+    ${card("Reembolso", pct(money.refundN || 0, tot.sales), "Reembolsos divididos pelas vendas.")}
+    ${card("Chargeback", pct(money.chargeN || 0, tot.sales), "Chargebacks divididos pelas vendas.")}
+  </div>
 </div>
-${networks.length ? html`<section aria-labelledby="by-net"><h2 class="h-lg" id="by-net">Por rede</h2>
-<div class="net-cards">${networks.map((n) => html`
-  <a class="net-card" href="/sales?${new URLSearchParams({ ...base, network: n.network })}">
-    <span class="net-name"><span class="net-mark" aria-hidden="true">${(NETWORKS[n.network]?.name || n.network).slice(0, 1)}</span>${NETWORKS[n.network]?.name || n.network}</span>
-    <span class="net-value">${m(n.revenue)}</span>
-    <span class="net-sub">${n.sales} ${n.sales === 1 ? "venda" : "vendas"} · ${n.refunds} ${n.refunds === 1 ? "reembolso" : "reembolsos"}</span>
-    <svg class="net-chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-  </a>`)}</div></section>` : ""}
+
 <section class="card pad">
-  <h2 class="h-lg">Por dia</h2>
+  <h2 class="h-md">Faturamento e gasto por dia</h2>
   ${chart(series, cur)}
 </section>
 <section class="card table-wrap">
@@ -103,9 +156,7 @@ ${networks.length ? html`<section aria-labelledby="by-net"><h2 class="h-lg" id="
     <nav class="tabs" aria-label="Agrupar por">
       ${tab("Campanhas", { ...base, ...withSrc }, !byAd)}${tab("Anúncios", { ...base, ...withSrc, by: "ad" }, byAd)}
     </nav>
-    <nav class="tabs" aria-label="Origem">
-      ${tab("Todas", { ...base, ...withBy }, !srcFilter)}${tab("Google Ads", { ...base, ...withBy, source: "google" }, srcFilter === "google")}${tab("NewsBreak", { ...base, ...withBy, source: "newsbreak" }, srcFilter === "newsbreak")}${sources.filter((x) => !["google", "newsbreak", "none"].includes(x)).map((x) => tab(SOURCE_LABEL[x] || x, { ...base, ...withBy, source: x }, srcFilter === x))}
-    </nav>
+
   </div>
   ${list.length ? html`
   <table class="links-table results-table">
