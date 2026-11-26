@@ -9,7 +9,7 @@ const SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 // Paths the panel uses; they can never be a back-half.
 export const RESERVED = new Set([
-  "login", "logout", "setup", "links", "pages", "domains", "static", "internal",
+  "login", "logout", "setup", "links", "domains", "static", "internal",
   "design", "favicon.ico", "robots.txt", "health", "api", "admin",
 ]);
 

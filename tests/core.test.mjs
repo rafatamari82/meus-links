@@ -98,39 +98,3 @@ test("clean geo", () => {
   assert.equal(core.countryOptions()[0][1], "Brasil");
   assert.equal(core.countryOptions().length, core.COUNTRY_CODES.length);
 });
-import { cleanPageData, parseFaq, renderRich, videoEmbed, renderPage } from "../src/pages.js";
-test("rich text is safe and supports the marks", () => {
-  const out = renderRich("## Title\nLine **bold** <script>x</script>\nsecond\n\n- a\n- b\n![alt](https://x.com/i.png)\n[[BOTAO]]\n![no](javascript:alert(1))", "<BTN>");
-  assert.match(out, /<h2>Title<\/h2>/);
-  assert.match(out, /<p>Line <strong>bold<\/strong> &lt;script&gt;x&lt;\/script&gt;<br>second<\/p>/);
-  assert.match(out, /<ul><li>a<\/li><li>b<\/li><\/ul>/);
-  assert.match(out, /<img src="https:\/\/x.com\/i.png" alt="alt"/);
-  assert.match(out, /<BTN>/);
-  assert.ok(!/javascript:alert/.test(out.replace("![no](javascript:alert(1))", "")) || out.includes("![no](javascript:alert(1))"));
-  assert.ok(!out.includes("<script>"));
-});
-test("video embed", () => {
-  assert.equal(videoEmbed("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
-  assert.equal(videoEmbed("https://youtu.be/dQw4w9WgXcQ"), "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
-  assert.equal(videoEmbed("https://vimeo.com/76979871"), "https://player.vimeo.com/video/76979871");
-  assert.equal(videoEmbed(""), null);
-  assert.equal(videoEmbed("https://evil.com/v"), undefined);
-});
-test("faq parsing", () => {
-  assert.deepEqual(parseFaq("Is it safe?\nYes, it is.\n\nP: How long?\nR: 30 days"), [{ q: "Is it safe?", a: "Yes, it is." }, { q: "How long?", a: "30 days" }]);
-});
-test("page data validation", () => {
-  const get = (o) => (k) => o[k];
-  let r = cleanPageData("tsl", get({ headline: "", body: "" }));
-  assert.ok(r.errors.headline && r.errors.body);
-  r = cleanPageData("review", get({ headline: "H", product_name: "P", rating: "7", image: "javascript:x" }));
-  assert.ok(r.errors.rating && r.errors.image);
-  r = cleanPageData("presell", get({ headline: "H", video: "https://evil.com", lang: "xx", accent: "hot" }));
-  assert.ok(r.errors.video);
-  assert.equal(r.data.lang, "pt");
-  assert.equal(r.data.accent, "green");
-  const html = renderPage({ link: { slashtag: "a b", template: "review" }, data: { headline: "<b>H</b>", product_name: "P", rating: "4.5", lang: "en", cta_text: "Go" }, assetVersion: "1" });
-  assert.match(html, /&lt;b&gt;H&lt;\/b&gt;/);
-  assert.match(html, /href="\/a%20b\/go"/);
-  assert.match(html, /<html lang="en">/);
-});

@@ -12,7 +12,6 @@ import {
   readSession, safeEqual, signSession,
 } from "./security.js";
 import * as V from "./views.js";
-import { cleanPageData, defaultPageData, PAGE_CSP, renderPage, TEMPLATES } from "./pages.js";
 
 const SESSION_DAYS = 30;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -174,13 +173,7 @@ async function serveShort(c, slashtag) {
   }
 
   let link = null;
-  let isCta = false;
-  const goMatch = slashtag.match(/^([^/]+)\/go$/);
-  if (goMatch) {
-    link = await db.prepare("select * from links where domain_id = ? and slashtag_lower = ? and kind = 'page'")
-      .bind(domain.id, goMatch[1].toLowerCase()).first();
-    isCta = Boolean(link);
-  } else if (slashtag && !slashtag.includes("/")) {
+  if (slashtag && !slashtag.includes("/")) {
     link = await db.prepare("select * from links where domain_id = ? and slashtag_lower = ?")
       .bind(domain.id, slashtag.toLowerCase()).first();
   }
@@ -197,21 +190,6 @@ async function serveShort(c, slashtag) {
 
   let target = link.destination;
   if (link.forward_parameters) target = core.forwardQuery(target, c.url.search);
-  const ua0 = c.req.headers.get("User-Agent") || "";
-
-  if (isCta) {
-    // Button click on a page: count it (people only) and go to the affiliate link.
-    if (c.req.method === "GET" && allowed && !core.isBot(ua0)) {
-      c.exec.waitUntil(db.prepare("update links set cta_clicks = cta_clicks + 1 where id = ?").bind(link.id).run()
-        .catch((e) => console.error("cta not recorded", e)));
-    }
-    if (!allowed) {
-      return new Response(V.geoBlocked(ASSET_VERSION), {
-        status: 403, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" },
-      });
-    }
-    return new Response(null, { status: 302, headers: { Location: target, "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" } });
-  }
 
   if (c.req.method === "GET") {
     const ua = (c.req.headers.get("User-Agent") || "").slice(0, 400);
@@ -236,16 +214,6 @@ async function serveShort(c, slashtag) {
     return new Response(V.geoBlocked(ASSET_VERSION), {
       status: 403,
       headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" },
-    });
-  }
-  if (link.kind === "page") {
-    let data = {};
-    try { data = JSON.parse(link.page_data || "{}"); } catch { /* render with defaults */ }
-    return new Response(renderPage({ link, data, assetVersion: ASSET_VERSION }), {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex",
-        "Content-Security-Policy": PAGE_CSP, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin",
-      },
     });
   }
   return new Response(null, {
@@ -323,7 +291,7 @@ async function readLinkForm(c) {
 }
 
 async function listLinks(c, q = "", domainFilter = "") {
-  let sql = "select l.*, d.full_name as domain_name from links l join domains d on d.id = l.domain_id where l.user_id = ? and l.kind = 'redirect'";
+  let sql = "select l.*, d.full_name as domain_name from links l join domains d on d.id = l.domain_id where l.user_id = ?";
   const args = [c.user.id];
   if (q) {
     const like = `%${q.replace(/[%_]/g, "")}%`;
@@ -403,7 +371,7 @@ async function linksPage(c) {
   const q = (c.url.searchParams.get("q") || "").trim();
   const domainFilter = c.url.searchParams.get("domain") || "";
   const rows = await listLinks(c, q, domainFilter);
-  const total = (await c.db.prepare("select count(*) as n from links where user_id = ? and kind = 'redirect'").bind(c.user.id).first()).n;
+  const total = (await c.db.prepare("select count(*) as n from links where user_id = ?").bind(c.user.id).first()).n;
   return c.respond(V.linksView(c.view(), {
     rows, total, q, domainFilter, domains: await userDomains(c), activeDomains: await userDomains(c, true),
     newId: c.url.searchParams.get("new"),
@@ -441,7 +409,6 @@ async function createLink(c) {
 async function editLink(c, id) {
   const link = await getLink(c, id);
   if (!link) return notFound(c);
-  if (link.kind === "page") return c.redirect(`/pages/${id}/edit`);
   let values = {
     destination: link.destination, slashtag: link.slashtag, title: link.title || "", domain_id: link.domain_id,
     geo_mode: link.geo_mode || "off", geo_countries: link.geo_countries || "",
@@ -473,8 +440,8 @@ async function deleteLink(c, id) {
   const link = await getLink(c, id);
   if (!link) return notFound(c);
   await c.db.prepare("delete from links where id = ? and user_id = ?").bind(id, c.user.id).run();
-  c.flash("success", link.kind === "page" ? `Página /${link.slashtag} apagada.` : `Link /${link.slashtag} apagado.`);
-  return c.redirect(link.kind === "page" ? "/pages" : "/links");
+  c.flash("success", `Link /${link.slashtag} apagado.`);
+  return c.redirect("/links");
 }
 
 async function linkStats(c, id) {
@@ -628,82 +595,6 @@ async function deleteDomain(c, id) {
   return c.redirect("/domains");
 }
 
-// ---------------------------------------------------------------- pages
-
-async function pagesPage(c) {
-  const rows = (await c.db.prepare(
-    "select l.*, d.full_name as domain_name from links l join domains d on d.id = l.domain_id where l.user_id = ? and l.kind = 'page' order by l.created_at desc, l.rowid desc limit 500",
-  ).bind(c.user.id).all()).results;
-  return c.respond(V.pagesView({ ...c.view(), newId: c.url.searchParams.get("new") }, { rows }));
-}
-
-async function pageEditor(c, id) {
-  let link = null;
-  let template = c.url.searchParams.get("template");
-  if (id) {
-    link = await getLink(c, id);
-    if (!link || link.kind !== "page") return notFound(c);
-    template = link.template;
-  }
-  if (c.req.method === "POST" && !id) template = String((await c.form()).get("template") || template);
-  if (!TEMPLATES[template]) return c.redirect("/pages");
-  const activeDomains = await userDomains(c, true);
-  const isNew = !id;
-
-  if (c.req.method !== "POST") {
-    let values;
-    if (link) {
-      let data = {};
-      try { data = JSON.parse(link.page_data || "{}"); } catch { /* keep empty */ }
-      values = { ...data, destination: link.destination, slashtag: link.slashtag, domain_id: link.domain_id,
-        geo_mode: link.geo_mode || "off", geo_countries: link.geo_countries || "" };
-    } else {
-      values = { ...defaultPageData(template, "en"), geo_mode: "off" };
-    }
-    return c.respond(V.pageEditorView(c.view(), { template, link, values, errors: {}, activeDomains, isNew }));
-  }
-
-  const f = await c.form();
-  const r = await readLinkForm(c);
-  const { data, errors: pageErrors } = cleanPageData(template, (k) => f.get(k));
-  const errors = { ...r.errors, ...pageErrors };
-  if (!isNew && !r.slug && !errors.slashtag) errors.slashtag = "O final do endereço não pode ficar vazio.";
-  const values = { ...data, ...r.values };
-  if (!Object.keys(errors).length) {
-    const ts = now();
-    const title = data.headline.slice(0, 200);
-    const json = JSON.stringify(data);
-    try {
-      if (isNew) {
-        const newLinkId = newId();
-        for (let i = 0; i < (r.slug ? 1 : 5); i++) {
-          const s = r.slug || core.randomSlug();
-          try {
-            await c.db.prepare(
-              "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, geo_mode, geo_countries, kind, template, page_data, created_at, updated_at) values (?,?,?,?,?,?,?,?,?, 'page', ?,?,?,?)",
-            ).bind(newLinkId, c.user.id, r.domain.id, s, s.toLowerCase(), r.dest, title, r.geo.mode, r.geo.countries, template, json, ts, ts).run();
-            c.flash("success", "Página publicada.");
-            return c.redirect(`/pages?new=${newLinkId}`);
-          } catch (e) {
-            if (!isUnique(e) || r.slug) throw e;
-          }
-        }
-        errors.form = "Não consegui gerar um final livre. Tente de novo.";
-      } else {
-        await c.db.prepare(
-          "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, geo_mode = ?, geo_countries = ?, page_data = ?, updated_at = ? where id = ? and user_id = ?",
-        ).bind(r.dest, r.slug, r.slug.toLowerCase(), title, r.domain.id, r.geo.mode, r.geo.countries, json, ts, id, c.user.id).run();
-        c.flash("success", "Página salva.");
-        return c.redirect("/pages");
-      }
-    } catch (e) {
-      if (!isUnique(e)) throw e;
-      errors.slashtag = `/${r.slug} já está em uso em ${r.domain.full_name}.`;
-    }
-  }
-  return c.respond(V.pageEditorView(c.view(), { template, link, values, errors, activeDomains, isNew }), 422);
-}
-
 function notFound(c) {
   return c.respond(V.publicNotFound(ASSET_VERSION), 404);
 }
@@ -719,11 +610,6 @@ function serveAsset(c, name) {
 // ---------------------------------------------------------------- router
 
 const PANEL_ROUTES = [
-  ["GET", /^\/pages$/, pagesPage],
-  ["GET", /^\/pages\/new$/, (c) => pageEditor(c, null)],
-  ["POST", /^\/pages\/new$/, (c) => pageEditor(c, null)],
-  ["GET", /^\/pages\/([\w-]+)\/edit$/, pageEditor],
-  ["POST", /^\/pages\/([\w-]+)\/edit$/, pageEditor],
   ["GET", /^\/links$/, linksPage],
   ["POST", /^\/links$/, createLink],
   ["GET", /^\/links\/([\w-]+)\/edit$/, editLink],

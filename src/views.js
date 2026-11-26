@@ -1,9 +1,20 @@
 // HTML views. Every interpolated value is escaped unless wrapped in raw().
 import { countryName, countryOptions } from "./core.js";
-import { ACCENTS, LANGS, TEMPLATES } from "./pages.js";
 
-import { esc, html, raw } from "./html.js";
-export { esc, html, raw };
+class Raw {
+  constructor(s) { this.s = s; }
+  toString() { return this.s; }
+}
+export const raw = (s) => new Raw(s);
+const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESC[c]);
+const render = (v) =>
+  v instanceof Raw ? v.s : Array.isArray(v) ? v.map(render).join("") : v === false || v == null ? "" : esc(v);
+export function html(strings, ...vals) {
+  let out = strings[0];
+  vals.forEach((v, i) => { out += render(v) + strings[i + 1]; });
+  return new Raw(out);
+}
 
 const TZ = "America/Sao_Paulo";
 const dateFmt = new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit", year: "numeric" });
@@ -44,7 +55,7 @@ export function page(c, title, body) {
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
     <a class="brand" href="/links">${ICON}<span>Meus links</span></a>
-    <nav>${nav("/links", "Links", c.section === "links")}${nav("/pages", "Páginas", c.section === "pages")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
+    <nav>${nav("/links", "Links", c.section === "links")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
     <form method="post" action="/logout" class="sidebar-foot">${csrfField(c)}<button class="btn btn-ghost btn-sm" type="submit">Sair</button></form>
   </aside>
   <main class="main" id="main">${flashes(c)}${body}</main>
@@ -305,17 +316,16 @@ export function statsView(c, { link, days, peak, refs, bots, blocked = 0, last30
     return html`<rect x="${i * 10 + 1}" y="${(115 - h).toFixed(1)}" width="8" height="${h > 0 ? h.toFixed(1) : 1}" class="${n ? "bar" : "bar-zero"}"><title>${label}: ${n}</title></rect>`;
   });
   return page({ ...c, section: "links" }, `Cliques em ${link.slashtag}`, html`
-<nav class="crumbs">${link.kind === "page" ? html`<a href="/pages">Páginas</a>` : html`<a href="/links">Links</a>`} <span aria-hidden="true">/</span> <span>${link.domain_name}/${link.slashtag}</span></nav>
+<nav class="crumbs"><a href="/links">Links</a> <span aria-hidden="true">/</span> <span>${link.domain_name}/${link.slashtag}</span></nav>
 <header class="page-head">
   <div><h1 class="h-xl">${link.title || `${link.domain_name}/${link.slashtag}`}</h1><p class="muted dest-line">→ ${link.destination}</p></div>
   <div class="row-end">
     <button class="btn btn-secondary" type="button" data-copy="${su}">Copiar link</button>
-    <a class="btn btn-primary" href="${link.kind === "page" ? `/pages/${link.id}/edit` : `/links/${link.id}/edit`}">Editar</a>
+    <a class="btn btn-primary" href="/links/${link.id}/edit">Editar</a>
   </div>
 </header>
 <div class="stats-grid">
-  <div class="card pad stat"><p class="stat-label">${link.kind === "page" ? "Visitas no total" : "Cliques no total"}</p><p class="stat-value">${link.clicks}</p></div>
-  ${link.kind === "page" ? html`<div class="card pad stat"><p class="stat-label">Cliques no botão</p><p class="stat-value">${link.cta_clicks || 0}${link.clicks ? html` <span class="stat-small muted">${Math.round(((link.cta_clicks || 0) / link.clicks) * 100)}%</span>` : ""}</p></div>` : ""}
+  <div class="card pad stat"><p class="stat-label">Cliques no total</p><p class="stat-value">${link.clicks}</p></div>
   <div class="card pad stat"><p class="stat-label">Últimos 30 dias</p><p class="stat-value">${last30}</p></div>
   <div class="card pad stat"><p class="stat-label">Último clique</p><p class="stat-value stat-small">${fmtDateTime(link.last_click_at)}</p></div>
 </div>
@@ -404,146 +414,4 @@ export function geoBlocked(assetVersion) {
 <p class="geo-emoji" aria-hidden="true">👀</p>
 <h1 class="h-lg">Oi, curioso! Aqui não.</h1>
 </main></body></html>`.s;
-}
-
-// ------------------------------------------------------------- pages
-
-export function pagesView(c, { rows }) {
-  const url = (l) => `${c.scheme}://${l.domain_name}/${l.slashtag}`;
-  return page({ ...c, section: "pages" }, "Páginas", html`
-<header class="page-head">
-  <div><h1 class="h-xl">Páginas</h1><p class="muted">Review, TSL e Presell no seu domínio, com o botão indo para o seu link de afiliado.</p></div>
-</header>
-<div class="template-grid">
-  ${Object.entries(TEMPLATES).map(([key, t]) => html`
-  <a class="card pad template-card" href="/pages/new?template=${key}">
-    <span class="h-lg">${t.label}</span>
-    <span class="muted">${t.hint}</span>
-    <span class="btn btn-secondary btn-sm">Criar ${t.label}</span>
-  </a>`)}
-</div>
-${rows.length ? html`
-<div class="card table-wrap">
-<table class="links-table">
-  <thead><tr><th scope="col">Página</th><th scope="col">Modelo</th><th scope="col" class="num">Visitas</th><th scope="col" class="num">Cliques no botão</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
-  <tbody>
-  ${rows.map((l) => html`
-  <tr class="${l.id === c.newId ? "is-new" : ""}">
-    <td data-label="Página">
-      <div class="link-title">${l.title || l.slashtag}</div>
-      <div class="short-row">
-        <a class="short-url" href="${url(l)}" target="_blank" rel="noopener">${l.domain_name}/${l.slashtag}</a>
-        <button class="btn btn-ghost btn-xs" type="button" data-copy="${url(l)}" aria-label="Copiar ${l.domain_name}/${l.slashtag}">Copiar</button>
-      </div>
-    </td>
-    <td data-label="Modelo">${TEMPLATES[l.template]?.label || "—"}</td>
-    <td data-label="Visitas" class="num">${l.clicks}</td>
-    <td data-label="Cliques no botão" class="num">${l.cta_clicks || 0}${l.clicks ? html` <span class="muted">(${Math.round(((l.cta_clicks || 0) / l.clicks) * 100)}%)</span>` : ""}</td>
-    <td class="actions-cell"><div class="actions">
-      <a class="btn btn-ghost btn-xs" href="/links/${l.id}" aria-label="Ver estatísticas de ${l.slashtag}">Estatísticas</a>
-      <a class="btn btn-secondary btn-xs" href="/pages/${l.id}/edit" aria-label="Editar página ${l.slashtag}">Editar</a>
-      <form method="post" action="/links/${l.id}/delete" data-confirm="Apagar a página ${l.domain_name}/${l.slashtag}?">
-        ${csrfField(c)}
-        <button class="btn btn-ghost btn-xs danger-text" type="submit" aria-label="Apagar página ${l.slashtag}">Apagar</button>
-      </form>
-    </div></td>
-  </tr>`)}
-  </tbody>
-</table>
-</div>` : html`<div class="empty card"><p class="muted">Nenhuma página ainda. Escolha um modelo acima para criar a primeira.</p></div>`}`);
-}
-
-function textField(name, label, v, e, { hint = "", rows = 0, max = 0, placeholder = "", required = false } = {}) {
-  const id = `f-${name}`;
-  const common = html`id="${id}" name="${name}" ${max ? raw(`maxlength="${max}"`) : ""} placeholder="${placeholder}" ${required ? raw("required") : ""} ${invalid(id + "-err", e[name])}`;
-  return html`<div class="field">
-  <label for="${id}">${label}</label>
-  ${rows ? html`<textarea ${common} rows="${rows}">${v[name] || ""}</textarea>` : html`<input ${common} value="${v[name] || ""}">`}
-  ${e[name] ? fieldError(id + "-err", e[name]) : hint ? html`<p class="hint">${hint}</p>` : ""}
-</div>`;
-}
-
-const RICH_HINT = "Linha em branco = novo parágrafo. ## Título, - item de lista, **negrito**, ![](https://imagem) e [[BOTAO]] para colocar um botão no meio do texto.";
-
-export function pageEditorView(c, { template, link, values, errors, activeDomains, isNew }) {
-  const v = values || {};
-  const e = errors || {};
-  const t = TEMPLATES[template];
-  const sel = (a, b) => (a === b ? raw("selected") : "");
-  const specific = template === "review" ? html`
-    ${textField("product_name", "Nome do produto", v, e, { max: 100, required: true })}
-    ${textField("rating", "Sua nota (0 a 5)", v, e, { max: 3, placeholder: "4.5", hint: "Opcional. É a sua avaliação; aparece em estrelas." })}
-    ${textField("intro", "Introdução", v, e, { rows: 4, max: 4000, hint: RICH_HINT })}
-    <div class="field-row">
-      ${textField("pros", "Pontos positivos (um por linha)", v, e, { rows: 5, max: 2000 })}
-      ${textField("cons", "Pontos negativos (um por linha)", v, e, { rows: 5, max: 2000 })}
-    </div>
-    ${textField("body", "Análise completa", v, e, { rows: 12, max: 30000, hint: RICH_HINT })}
-    ${textField("verdict", "Veredito", v, e, { rows: 4, max: 4000 })}
-    ${textField("faq", "Perguntas frequentes", v, e, { rows: 6, max: 8000, hint: "Separe cada pergunta com uma linha em branco: primeira linha é a pergunta, as seguintes, a resposta." })}`
-    : template === "tsl" ? html`
-    ${textField("body", "Texto da carta de vendas", v, e, { rows: 22, max: 60000, required: true, hint: RICH_HINT })}
-    ${textField("guarantee", "Garantia", v, e, { rows: 4, max: 3000, placeholder: "Ex.: 60 dias de garantia: se não gostar, devolvemos seu dinheiro." })}
-    ${textField("faq", "Perguntas frequentes", v, e, { rows: 6, max: 8000, hint: "Separe cada pergunta com uma linha em branco: primeira linha é a pergunta, as seguintes, a resposta." })}
-    ${textField("ps", "P.S.", v, e, { rows: 3, max: 3000 })}`
-    : html`
-    ${textField("body", "Texto", v, e, { rows: 8, max: 8000, hint: RICH_HINT })}
-    ${textField("video", "Vídeo (opcional)", v, e, { max: 2048, placeholder: "https://www.youtube.com/watch?v=…", hint: "YouTube ou Vimeo. Se tiver vídeo, ele aparece no lugar da imagem." })}`;
-
-  return page({ ...c, section: "pages" }, `${isNew ? "Nova página" : "Editar página"} ${t.label}`, html`
-<nav class="crumbs"><a href="/pages">Páginas</a> <span aria-hidden="true">/</span> <span>${isNew ? `Nova ${t.label}` : `${link.domain_name}/${link.slashtag}`}</span></nav>
-<header class="page-head">
-  <h1 class="h-xl">${isNew ? `Nova página ${t.label}` : `Editar página ${t.label}`}</h1>
-  ${!isNew ? html`<a class="btn btn-secondary" href="${c.scheme}://${link.domain_name}/${link.slashtag}" target="_blank" rel="noopener">Ver página</a>` : ""}
-</header>
-<form method="post" class="card pad narrow stack" novalidate>
-  ${csrfField(c)}
-  <input type="hidden" name="template" value="${template}">
-  ${e.form ? html`<p class="alert alert-error" role="alert">${e.form}</p>` : ""}
-  <h2 class="h-lg">Endereço e botão</h2>
-  <div class="field-row">
-    <div class="field">
-      <label for="domain_id">Domínio</label>
-      <select id="domain_id" name="domain_id" ${invalid("domain-err", e.domain_id)}>
-        ${activeDomains.map((d) => html`<option value="${d.id}" ${(v.domain_id ? v.domain_id === d.id : d.is_default) ? raw("selected") : ""}>${d.full_name}</option>`)}
-      </select>
-      ${fieldError("domain-err", e.domain_id)}
-    </div>
-    <div class="field grow">
-      <label for="slashtag">Final do endereço ${isNew ? html`<span class="muted">(opcional)</span>` : ""}</label>
-      <div class="input-prefix"><span aria-hidden="true">/</span>
-        <input id="slashtag" name="slashtag" maxlength="50" autocomplete="off" spellcheck="false" placeholder="${isNew ? "gerado se vazio" : ""}" value="${v.slashtag}" ${invalid("slashtag-err", e.slashtag)}>
-      </div>
-      ${fieldError("slashtag-err", e.slashtag)}
-    </div>
-  </div>
-  <div class="field">
-    <label for="destination">Link do botão (seu link de afiliado)</label>
-    <input id="destination" name="destination" type="url" maxlength="2048" required placeholder="https://…" value="${v.destination}" ${invalid("destination-err", e.destination)}>
-    ${fieldError("destination-err", e.destination)}
-  </div>
-  <div class="field-row">
-    ${textField("cta_text", "Texto do botão", v, e, { max: 60 })}
-    <div class="field"><label for="accent">Cor</label>
-      <select id="accent" name="accent">${Object.entries(ACCENTS).map(([k, label]) => html`<option value="${k}" ${sel(v.accent || "green", k)}>${label}</option>`)}</select></div>
-    <div class="field"><label for="lang">Idioma da página</label>
-      <select id="lang" name="lang">${Object.entries(LANGS).map(([k, label]) => html`<option value="${k}" ${sel(v.lang || "en", k)}>${label}</option>`)}</select></div>
-  </div>
-
-  <h2 class="h-lg">Conteúdo</h2>
-  ${textField("headline", "Título principal", v, e, { max: 200, required: true })}
-  ${textField("subheadline", "Subtítulo", v, e, { rows: 2, max: 400 })}
-  ${textField("image", "Imagem principal (endereço)", v, e, { max: 2048, placeholder: "https://…/imagem.jpg", hint: "Cole o link de uma imagem já publicada (por exemplo, a do seu site ou do produtor)." })}
-  ${specific}
-
-  <h2 class="h-lg">Rodapé e aviso</h2>
-  ${textField("notice", "Selo no topo (opcional)", v, e, { max: 60, placeholder: "Ex.: Publicidade", hint: "Uma faixa discreta no topo da página. Deixe vazio para não mostrar." })}
-  ${textField("disclosure", "Aviso de afiliado", v, e, { rows: 3, max: 600, hint: "Recomendado: dizer que você pode ganhar comissão. Muitas plataformas e leis de publicidade exigem." })}
-
-  ${geoFields(v, e)}
-  <div class="row-end">
-    <a class="btn btn-ghost" href="/pages">Cancelar</a>
-    <button class="btn btn-primary" type="submit">${isNew ? "Publicar página" : "Salvar"}</button>
-  </div>
-</form>`);
 }
