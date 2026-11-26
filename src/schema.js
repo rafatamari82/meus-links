@@ -57,6 +57,14 @@ export const SCHEMA = [
   `create table if not exists push_subs (
     id text primary key, endpoint text not null unique, p256dh text not null, auth text not null,
     label text, created_at text not null, last_ok_at text)`,
+  `create table if not exists spy_keywords (
+    id text primary key, keyword text not null, country text not null default 'US', created_at text not null,
+    unique (keyword, country))`,
+  `create table if not exists spy_checks (
+    keyword_id text not null references spy_keywords(id) on delete cascade, date text not null,
+    status text not null check (status in ('yes','no','ad')), note text, primary key (keyword_id, date))`,
+  `create table if not exists spy_domains (
+    id text primary key, domain text not null, country text not null default 'US', created_at text not null, unique (domain, country))`,
   `create table if not exists tk_events (
     id integer primary key autoincrement, at text not null, network text, outcome text not null, detail text, raw text)`,
 ];
