@@ -277,7 +277,7 @@ const WHERE = {
   gurumedia: "No painel da GuruMedia, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1.",
   smartadv: "No painel da SmartADV, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1.",
   smashloud: "No painel da SmashLoud, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1.",
-  clickadv: "Postback global no painel da rede; peça os macros ao gerente se não achar.",
+  clickadv: "No painel da ClickADV, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1. O valor é a sua comissão, não o preço da venda.",
   hotmart: "Ferramentas → Webhook → Cadastrar. Eventos: compra aprovada, reembolso, chargeback. O código vai no sck (ou src, como afiliado).",
   kiwify: "Apps → Webhooks → Criar webhook. Eventos: compra aprovada, reembolso, chargeback.",
 };

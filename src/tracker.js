@@ -20,7 +20,7 @@ export const NETWORKS = {
   gurumedia: { name: "GuruMedia", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}" },
   smartadv: { name: "SmartADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}" },
   smashloud: { name: "SmashLoud", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={currency}" },
-  clickadv: { name: "ClickADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout}&txid={transaction_id}", check: true },
+  clickadv: { name: "ClickADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={conversion_id}&currency={offer_currency}" },
   hotmart: { name: "Hotmart", param: "sck", currency: "BRL", json: true },
   kiwify: { name: "Kiwify", param: "sck", currency: "BRL", json: true },
   other: { name: "Outra rede", param: "sub1", currency: "USD", query: "cid=SUBID&amount=VALOR&txid=PEDIDO", check: true },
