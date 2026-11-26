@@ -101,6 +101,15 @@ export async function postback(c, key, network) {
     click = await c.db.prepare("select * from tk_clicks where id = ?").bind(id).first();
     if (click) break;
   }
+  if (p.type === "reject") {
+    const orig = p.txid && await c.db.prepare("select 1 from tk_conversions where network = ? and txid = ? and type in ('sale','upsell')").bind(network, p.txid).first();
+    if (!orig) {
+      await logEvent(c.db, network, "ignorado", `conversão recusada${p.txid ? ` (pedido ${p.txid})` : ""} sem venda anterior`, raw);
+      return text("ok (ignorado)");
+    }
+    p.type = "refund";
+    p.amount_cents = null;
+  }
   if (p.type !== "sale" && p.type !== "upsell" && p.amount_cents == null && p.txid) {
     const orig = await c.db.prepare("select amount_cents, currency from tk_conversions where network = ? and txid = ? and type in ('sale','upsell')")
       .bind(network, p.txid).first();

@@ -278,6 +278,7 @@ const WHERE = {
   smartadv: "No painel da SmartADV, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1.",
   smashloud: "No painel da SmashLoud, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1.",
   clickadv: "No painel da ClickADV, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1. O valor é a sua comissão, não o preço da venda.",
+  medisscalers: "No painel da MedisScalers, campo de postback (onde está o da outra ferramenta). O código do clique vai em sub1. Conversão pendente conta como venda; se depois vier recusada, ela é descontada.",
   hotmart: "Ferramentas → Webhook → Cadastrar. Eventos: compra aprovada, reembolso, chargeback. O código vai no sck (ou src, como afiliado).",
   kiwify: "Apps → Webhooks → Criar webhook. Eventos: compra aprovada, reembolso, chargeback.",
 };

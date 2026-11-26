@@ -23,6 +23,7 @@ export const NETWORKS = {
   clickadv: { name: "ClickADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={conversion_id}&currency={offer_currency}" },
   hotmart: { name: "Hotmart", param: "sck", currency: "BRL", json: true },
   kiwify: { name: "Kiwify", param: "sck", currency: "BRL", json: true },
+  medisscalers: { name: "MedisScalers", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&status={status}" },
   other: { name: "Outra rede", param: "sub1", currency: "USD", query: "cid=SUBID&amount=VALOR&txid=PEDIDO", check: true },
 };
 
@@ -177,11 +178,12 @@ export function parsePostback(network, fields, json) {
   const txid = pick(f, "txid", "order_id", "orderid", "transaction_id", "transaction", "receipt", "order")
     ?? (json ? pick(json, "txid", "order_id", "transaction_id") : null);
   const typeRaw = pick(f, "type", "status", "event", "conv_type", "transaction_type") ?? (json ? pick(json, "type", "status", "event") : null);
-  if (/declin|fail|pending|abandon|lead|view|checkout/i.test(String(typeRaw || "")) && !/refund|charge/i.test(String(typeRaw))) {
-    return { ignore: `tipo ${typeRaw}` };
-  }
+  const tr = String(typeRaw || "");
+  if (/abandon|lead|view|checkout/i.test(tr) && !/refund|charge/i.test(tr)) return { ignore: `tipo ${typeRaw}` };
+  // A rejected or reversed conversion undoes a sale already counted; pending counts as a sale (approval repeats the order ID).
+  const rejected = /declin|fail|reject|revers|invalid|denied|cancel/i.test(tr) && !/refund|charge/i.test(tr);
   return {
-    ids, type: normType(typeRaw), txid: txid == null ? "" : String(txid).slice(0, 120),
+    ids, type: rejected ? "reject" : normType(typeRaw), txid: txid == null ? "" : String(txid).slice(0, 120),
     amount_cents: toCents(amount),
     currency: String(pick(f, "currency", "cur") || net.currency).replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3) || net.currency,
   };

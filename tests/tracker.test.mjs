@@ -85,3 +85,11 @@ test("GuruMedia postback with its real macros filled in", () => {
   const p = T.parsePostback("gurumedia", { cid: "ctdddddddddd", amount: "45.00", txid: "GM77", currency: "usd" }, null);
   assert.deepEqual([p.type, p.amount_cents, p.txid, p.currency, p.ids[0]], ["sale", 4500, "GM77", "USD", "ctdddddddddd"]);
 });
+
+test("MedisScalers statuses", () => {
+  const ok = T.parsePostback("medisscalers", { cid: "cteeeeeeeeee", amount: "30", txid: "M1", currency: "USD", status: "approved" }, null);
+  assert.equal(ok.type, "sale");
+  assert.equal(T.parsePostback("medisscalers", { cid: "cteeeeeeeeee", txid: "M1", status: "pending" }, null).type, "sale");
+  assert.equal(T.parsePostback("medisscalers", { cid: "cteeeeeeeeee", txid: "M1", status: "rejected" }, null).type, "reject");
+  assert.equal(T.parsePostback("medisscalers", { txid: "M1", status: "refunded" }, null).type, "refund");
+});
