@@ -17,6 +17,9 @@ env.__testFetch = async (url, init) => {
   return fetch(base + u.pathname + u.search, { ...init, headers: { ...(init?.headers || {}), "X-Test-Host": u.hostname } });
 };
 
+// Dev: a fixed exchange rate instead of calling the quote service.
+env.__ratesFetch = async () => new Response(JSON.stringify({ USDBRL: { bid: "5.40" }, EURBRL: { bid: "6.20" } }));
+
 // Test hook: phone notifications are logged instead of sent.
 if (process.env.TEST_ROUTES) {
   env.__notifyFetch = async (url, init) => {

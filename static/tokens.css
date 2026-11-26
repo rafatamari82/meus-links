@@ -1,18 +1,18 @@
 /* gerado de replica/design/tokens.json */
 :root {
   --color-bg: #ffffff;
-  --color-surface: #f5f7f6;
-  --color-border: #e1e6e4;
-  --color-border-input: #7c8784;
-  --color-text: #121a18;
-  --color-text-muted: #55615d;
-  --color-accent: #0f6b5c;
-  --color-accent-hover: #0b5648;
-  --color-accent-soft: #e3f1ee;
+  --color-surface: #f4f4f5;
+  --color-border: #e4e4e7;
+  --color-border-input: #8a8a92;
+  --color-text: #0a0a0a;
+  --color-text-muted: #5b5b63;
+  --color-accent: #000000;
+  --color-accent-hover: #27272a;
+  --color-accent-soft: #ececee;
   --color-on-accent: #ffffff;
   --color-danger: #b42828;
   --color-danger-soft: #fbe9e9;
-  --color-success: #1c6e45;
+  --color-success: #157347;
   --color-warning: #8a5a00;
   --color-warning-soft: #fdf3dc;
   --font-sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;

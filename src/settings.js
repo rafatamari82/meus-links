@@ -1,0 +1,120 @@
+// Ajustes: the phone settings screen. Short on purpose; the full setup stays in Integrações (desktop).
+import { csrfField, fieldError, fmtDateTime, html, page, raw } from "./views.js";
+import { checkPassword, hashPassword } from "./security.js";
+import { fmtMoney, NETWORKS } from "./tracker.js";
+import { freshRates, getSettings, setSetting } from "./tracker-routes.js";
+
+const chev = raw('<svg class="row-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>');
+
+export async function settingsPage(c) {
+  const s = await freshRates(c, await getSettings(c.db));
+  const nets = (await c.db.prepare(
+    "select network from links where track = 1 and network is not null union select distinct network from tk_conversions",
+  ).all()).results.map((r) => r.network).filter((n) => NETWORKS[n]);
+  const devices = (await c.db.prepare("select count(*) as n from push_subs").first()).n;
+  return c.respond(settingsView(c.view(), { s, nets, devices, email: c.user.email }));
+}
+
+function settingsView(c, { s, nets, devices, email }) {
+  const sw = (action, name, on, label, extra = "") => html`
+    <form method="post" action="/settings/${action}" class="set-row">
+      ${csrfField(c)}${extra}
+      <label class="set-switch"><span class="set-label">${label}</span>
+        <input type="checkbox" role="switch" name="${name}" value="1" ${on ? raw("checked") : ""} data-autosubmit>
+        <span class="switch" aria-hidden="true"></span></label>
+    </form>`;
+  return page({ ...c, section: "settings" }, "Ajustes", html`
+<header class="page-head"><h1 class="h-xl">Ajustes</h1></header>
+
+<h2 class="set-title">Conta</h2>
+<div class="set-group">
+  <div class="set-row"><span class="set-label">E-mail</span><span class="set-value muted">${email}</span></div>
+  <a class="set-row" href="/settings/password"><span class="set-label">Trocar a senha</span>${chev}</a>
+</div>
+
+<h2 class="set-title">Moeda</h2>
+<div class="set-group">
+  <form method="post" action="/settings/currency" class="set-row set-seg">
+    ${csrfField(c)}
+    <span class="set-label">Mostrar valores em</span>
+    <span class="seg2">
+      <button type="submit" name="currency" value="BRL" class="${s.currency === "BRL" ? "is-on" : ""}" aria-pressed="${s.currency === "BRL"}">Real</button>
+      <button type="submit" name="currency" value="USD" class="${s.currency === "USD" ? "is-on" : ""}" aria-pressed="${s.currency === "USD"}">Dólar</button>
+    </span>
+  </form>
+  <div class="set-row"><span class="set-label">Dólar hoje</span><span class="set-value">${fmtMoney(Math.round(s.usd_brl * 100), "BRL")}</span></div>
+</div>
+<p class="set-note">${s.rate_auto ? `Cotação automática${s.rate_at ? `, atualizada em ${fmtDateTime(s.rate_at)}` : ""}. Vendas em dólar e gasto em real são convertidos por ela.` : "Cotação digitada à mão, em Integrações."}</p>
+
+<h2 class="set-title">Notificações de venda</h2>
+<div class="set-group">
+  <form method="post" action="/integrations/push-subscribe" class="set-row" data-push data-push-key="${s.vapid.publicKey}">
+    ${csrfField(c)}
+    <input type="hidden" name="endpoint"><input type="hidden" name="p256dh"><input type="hidden" name="auth"><input type="hidden" name="label">
+    <span class="set-label">Avisos neste celular<span class="hint" data-push-status role="status">${devices ? `${devices} aparelho(s) ativado(s)` : ""}</span></span>
+    <button class="btn btn-primary btn-sm" type="button" data-push-enable>Ativar</button>
+  </form>
+  ${nets.map((n) => sw("mute", "on", !s.notify_muted.includes(n), NETWORKS[n].name, html`<input type="hidden" name="network" value="${n}">`))}
+  ${sw("refunds", "on", s.notify_refunds, "Avisar reembolsos")}
+  <form method="post" action="/integrations/notify-test" class="set-row">${csrfField(c)}
+    <button class="set-link" type="submit">Testar aviso</button></form>
+</div>
+<p class="set-note">No iPhone, abra o Cutti pelo ícone da Tela de Início antes de ativar.</p>
+
+<h2 class="set-title">Mais</h2>
+<div class="set-group">
+  <a class="set-row" href="/integrations"><span class="set-label">Integrações e postbacks<span class="hint">Melhor no computador</span></span>${chev}</a>
+  <a class="set-row" href="/domains"><span class="set-label">Domínios</span>${chev}</a>
+  <form method="post" action="/logout" class="set-row">${csrfField(c)}<button class="set-link danger-text" type="submit">Sair</button></form>
+</div>`);
+}
+
+export async function settingsPost(c, action) {
+  const f = await c.form();
+  if (action === "currency") {
+    const cur = String(f.get("currency")) === "USD" ? "USD" : "BRL";
+    await setSetting(c.db, "currency", cur);
+    c.flash("success", cur === "USD" ? "Valores em dólar." : "Valores em real.");
+  } else if (action === "refunds") {
+    await setSetting(c.db, "notify_refunds", f.get("on") ? "1" : "0");
+  } else if (action === "mute") {
+    const n = String(f.get("network") || "");
+    if (NETWORKS[n]) {
+      const s = await getSettings(c.db);
+      const muted = new Set(s.notify_muted);
+      if (f.get("on")) muted.delete(n); else muted.add(n);
+      await setSetting(c.db, "notify_muted", [...muted].join(","));
+    }
+  }
+  return c.redirect("/settings");
+}
+
+export function passwordPage(c, errors = {}, status = 200) {
+  return c.respond(page({ ...c.view(), section: "settings" }, "Trocar a senha", html`
+<nav class="crumbs"><a href="/settings">Ajustes</a> <span aria-hidden="true">/</span> <span>Trocar a senha</span></nav>
+<header class="page-head"><h1 class="h-xl">Trocar a senha</h1></header>
+<form method="post" action="/settings/password" class="card pad stack narrow" novalidate>
+  ${csrfField(c.view())}
+  <div class="field"><label for="current">Senha atual</label>
+    <input id="current" name="current" type="password" autocomplete="current-password" required ${errors.current ? raw('aria-invalid="true" aria-describedby="cur-err"') : ""}>
+    ${fieldError("cur-err", errors.current)}</div>
+  <div class="field"><label for="new">Senha nova</label>
+    <input id="new" name="new" type="password" autocomplete="new-password" required minlength="12" ${errors.new ? raw('aria-invalid="true" aria-describedby="new-err"') : ""}>
+    ${fieldError("new-err", errors.new)}<p class="hint">Pelo menos 12 caracteres.</p></div>
+  <button class="btn btn-primary btn-block" type="submit">Salvar senha</button>
+</form>`), status);
+}
+
+export async function passwordPost(c) {
+  const f = await c.form();
+  const cur = String(f.get("current") || "");
+  const pw = String(f.get("new") || "");
+  const errors = {};
+  if (!(await checkPassword(cur, c.user.password_hash))) errors.current = "A senha atual não confere.";
+  if (pw.length < 12) errors.new = "Use pelo menos 12 caracteres.";
+  if (Object.keys(errors).length) return passwordPage(c, errors, 422);
+  await c.db.prepare("update users set password_hash = ?, updated_at = ? where id = ?")
+    .bind(await hashPassword(pw), new Date().toISOString(), c.user.id).run();
+  c.flash("success", "Senha trocada.");
+  return c.redirect("/settings");
+}

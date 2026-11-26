@@ -576,6 +576,34 @@ class E2E(unittest.TestCase):
         expect(m.get_by_role("link", name="Domínios")).to_be_visible()
         m.context.close()
 
+    def test_t09_phone_settings(self):
+        m = self.browser.new_context(viewport={"width": 390, "height": 844},
+                                     storage_state=self.ctx.storage_state()).new_page()
+        m.goto(self.base + "/results")
+        m.get_by_role("navigation", name="Navegação principal").get_by_role("link", name="Ajustes").click()
+        expect(m.get_by_role("heading", name="Ajustes", exact=True)).to_be_visible()
+        expect(m.get_by_text("R$ 5,40")).to_be_visible()
+        m.get_by_role("button", name="Dólar").click()
+        expect(m.get_by_role("button", name="Dólar")).to_have_attribute("aria-pressed", "true")
+        m.goto(self.base + "/results")
+        expect(m.locator(".kpi-hero")).to_contain_text("US$")
+        m.goto(self.base + "/settings")
+        m.get_by_role("button", name="Real").click()
+        expect(m.get_by_role("button", name="Real")).to_have_attribute("aria-pressed", "true")
+        sw = m.get_by_role("switch", name="Avisar reembolsos")
+        was = sw.is_checked()
+        m.locator("label.set-switch", has_text="Avisar reembolsos").click()
+        expect(m.get_by_role("switch", name="Avisar reembolsos")).to_be_checked(checked=not was)
+        m.get_by_role("link", name="Trocar a senha").click()
+        m.get_by_label("Senha atual").fill("errada-errada-1")
+        m.get_by_label("Senha nova").fill("curta")
+        m.get_by_role("button", name="Salvar senha").click()
+        expect(m.locator("#cur-err")).to_be_visible()
+        expect(m.locator("#new-err")).to_be_visible()
+        width = m.evaluate("document.documentElement.scrollWidth")
+        self.assertLessEqual(width, 390)
+        m.context.close()
+
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
                                      storage_state=self.ctx.storage_state()).new_page()

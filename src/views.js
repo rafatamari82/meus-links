@@ -37,7 +37,7 @@ function head(title, assetVersion) {
   <meta name="robots" content="noindex">
   <title>${title} · Cutti</title>
   <link rel="manifest" href="/static/manifest.webmanifest">
-  <meta name="theme-color" content="#0f6b5c">
+  <meta name="theme-color" content="#000000">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -62,7 +62,7 @@ export function page(c, title, body) {
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
     <a class="brand" href="/results">${ICON}<span>Cutti</span></a>
-    <nav>${nav("/results", "Resultados", c.section === "results")}${nav("/sales", "Vendas", c.section === "sales")}${nav("/links", "Encurtador de Link", c.section === "links")}${nav("/integrations", "Integrações", c.section === "integrations")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
+    <nav>${nav("/results", "Resultados", c.section === "results")}${nav("/sales", "Vendas", c.section === "sales")}${nav("/links", "Encurtador de Link", c.section === "links")}${nav("/integrations", "Integrações", c.section === "integrations")}${nav("/domains", "Domínios", c.section === "domains")}${nav("/settings", "Ajustes", c.section === "settings")}</nav>
     <form method="post" action="/logout" class="sidebar-foot">${csrfField(c)}<button class="btn btn-ghost btn-sm" type="submit">Sair</button></form>
   </aside>
   <main class="main" id="main">${flashes(c)}${body}</main>
@@ -71,7 +71,7 @@ export function page(c, title, body) {
   ${tabItem("/results", "Início", TAB_ICONS.home, c.section === "results")}
   ${tabItem("/sales", "Vendas", TAB_ICONS.list, c.section === "sales")}
   ${tabItem("/links", "Links", TAB_ICONS.link, c.section === "links")}
-  ${tabItem("/integrations", "Ajustes", TAB_ICONS.gear, ["integrations", "domains"].includes(c.section))}
+  ${tabItem("/settings", "Ajustes", TAB_ICONS.gear, ["settings", "integrations", "domains"].includes(c.section))}
 </nav>
 <div class="sr-only" aria-live="polite" id="live"></div>
 </body></html>`.s;

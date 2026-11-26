@@ -36,11 +36,39 @@ export async function getSettings(db) {
     tg_chat: s.tg_chat || "",
     tg_name: s.tg_name || "",
     notify_refunds: s.notify_refunds !== "0",
+    notify_muted: (s.notify_muted || "").split(",").filter(Boolean),
+    rate_auto: s.rate_auto !== "0",
+    rate_at: s.rate_at || "",
     templates: Object.fromEntries(Object.entries(T.TEMPLATE_DEFAULTS).map(([k, d]) => [k, s[`tpl_${k}`] || d])),
   };
 }
 
-async function setSetting(db, key, value) {
+/** Today's dollar and euro in reais, from AwesomeAPI (free, no key). Refreshed at most every 3 hours. */
+let ratesFailedAt = 0;
+export async function freshRates(c, s) {
+  if (!s.rate_auto) return s;
+  if (Date.now() - ratesFailedAt < 10 * 60e3) return s; // the quote service was down a moment ago
+  if (s.rate_at && Date.now() - Date.parse(s.rate_at) < 3 * 36e5) return s;
+  try {
+    const r = await (c.env.__ratesFetch || fetch)("https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL", { signal: AbortSignal.timeout(2500) });
+    const j = await r.json();
+    const usd = Number(j?.USDBRL?.bid);
+    const eur = Number(j?.EURBRL?.bid);
+    if (usd > 1 && usd < 50 && eur > 1 && eur < 50) {
+      const at = new Date().toISOString();
+      await setSetting(c.db, "usd_brl", usd);
+      await setSetting(c.db, "eur_brl", eur);
+      await setSetting(c.db, "rate_at", at);
+      return { ...s, usd_brl: usd, eur_brl: eur, rate_at: at };
+    }
+  } catch (e) {
+    console.error("cotação", e?.name || e);
+  }
+  ratesFailedAt = Date.now();
+  return s;
+}
+
+export async function setSetting(db, key, value) {
   await db.prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value")
     .bind(`tk_${key}`, String(value)).run();
 }
@@ -136,7 +164,7 @@ export async function postback(c, key, network) {
     raw);
 
   // Phone notification.
-  if (!dup && (p.type === "sale" || p.type === "upsell" || s.notify_refunds)) {
+  if (!dup && !s.notify_muted.includes(network) && (p.type === "sale" || p.type === "upsell" || s.notify_refunds)) {
     c.exec.waitUntil(saleMessage(c.db, s, network, p, click).then((m) => notify(c.db, s, m, c.env.__notifyFetch || fetch)).catch((e) => console.error("notify", e)));
   }
 
@@ -328,7 +356,7 @@ export function readRange(params) {
 const sumRev = (type, cents) => (type === "refund" || type === "chargeback" ? -cents : cents);
 
 export async function resultsPage(c) {
-  const s = await getSettings(c.db);
+  const s = await freshRates(c, await getSettings(c.db));
   const range = readRange(c.url.searchParams);
   const byAd = c.url.searchParams.get("by") === "ad";
   const srcFilter = c.url.searchParams.get("source") || "";
@@ -433,7 +461,7 @@ export async function resultsPage(c) {
 }
 
 export async function salesPage(c) {
-  const s = await getSettings(c.db);
+  const s = await freshRates(c, await getSettings(c.db));
   const range = readRange(c.url.searchParams);
   const network = T.NETWORKS[c.url.searchParams.get("network")] ? c.url.searchParams.get("network") : "";
   const sales = (await c.db.prepare(
@@ -463,6 +491,8 @@ export async function integrationsPost(c, action) {
     const eur = Number(String(f.get("eur_brl") || "").replace(",", "."));
     if (!(usd > 0) || !(eur > 0)) return integrationsPage(c, { settingsError: "Digite um câmbio maior que zero." }, 422);
     await setSetting(c.db, "currency", T.CURRENCIES.includes(cur) ? cur : "BRL");
+    await setSetting(c.db, "rate_auto", f.get("rate_auto") ? "1" : "0");
+    if (f.get("rate_auto")) await setSetting(c.db, "rate_at", "");
     await setSetting(c.db, "usd_brl", usd);
     await setSetting(c.db, "eur_brl", eur);
     await setSetting(c.db, "gads_conv_name", String(f.get("gads_conv_name") || "Venda").trim().slice(0, 100) || "Venda");

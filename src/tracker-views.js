@@ -274,6 +274,8 @@ ${notifySection(c, s, tgError, devices)}
     ${csrfField(c)}
     <div class="field-row">
       <div class="field"><label for="currency">Mostrar valores em</label><select id="currency" name="currency">${["BRL", "USD", "EUR"].map((x) => curOpt(x, s.currency))}</select></div>
+      <div class="field"><label class="check"><input type="checkbox" name="rate_auto" value="1" ${s.rate_auto ? raw("checked") : ""}> Cotação automática do dia</label>
+        <p class="hint">${s.rate_at ? `Atualizada em ${fmtDateTime(s.rate_at)}.` : "Busca a cotação na próxima abertura."} Desmarque para digitar à mão.</p></div>
       <div class="field"><label for="usd_brl">1 dólar = R$</label><input id="usd_brl" name="usd_brl" inputmode="decimal" value="${String(s.usd_brl).replace(".", ",")}"></div>
       <div class="field"><label for="eur_brl">1 euro = R$</label><input id="eur_brl" name="eur_brl" inputmode="decimal" value="${String(s.eur_brl).replace(".", ",")}"></div>
     </div>
