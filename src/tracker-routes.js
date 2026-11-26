@@ -40,6 +40,7 @@ export async function getSettings(db) {
     rate_auto: s.rate_auto !== "0",
     rate_at: s.rate_at || "",
     rate_src: s.rate_src || "",
+    email_on: s.email_on !== "0",
     templates: Object.fromEntries(Object.entries(T.TEMPLATE_DEFAULTS).map(([k, d]) => [k, s[`tpl_${k}`] || d])),
   };
 }
@@ -176,7 +177,7 @@ export async function postback(c, key, network) {
 
   // Phone notification.
   if (!dup && !s.notify_muted.includes(network) && (p.type === "sale" || p.type === "upsell" || s.notify_refunds)) {
-    c.exec.waitUntil(saleMessage(c.db, s, network, p, click).then((m) => notify(c.db, s, m, c.env.__notifyFetch || fetch)).catch((e) => console.error("notify", e)));
+    c.exec.waitUntil(saleMessage(c.db, s, network, p, click).then((m) => notify(c.db, s, m, c.env.__notifyFetch || fetch, { email: c.env.EMAIL, panel: `https://${c.panelHost()}` })).catch((e) => console.error("notify", e)));
   }
 
   // Tell NewsBreak about the sale, so its algorithm learns from it.
@@ -225,13 +226,14 @@ function messageFrom(s, vars, refund) {
   return {
     title: T.renderTemplate(refund ? t.refund_title : t.sale_title, vars) || "Cutti",
     body: T.renderTemplate(refund ? t.refund_body : t.sale_body, vars),
-    refund,
+    refund, vars,
   };
 }
 
 /** Send to every channel that is set up. Returns a list of errors (empty when all went out). */
-export async function notify(db, s, m, fetcher = fetch) {
+export async function notify(db, s, m, fetcher = fetch, { email = null, panel = "" } = {}) {
   const jobs = [];
+  if (s.email_on && email) jobs.push(sendSaleEmail(email, m, panel).then(() => null));
   const subs = (await db.prepare("select * from push_subs").all()).results;
   if (subs.length) {
     const owner = await db.prepare("select email from users limit 1").first();
@@ -264,6 +266,35 @@ export async function notify(db, s, m, fetcher = fetch) {
   }
   const out = await Promise.all(jobs.map((j) => j.catch((e) => `falha de conexão (${e?.name || "erro"})`)));
   return { sent: jobs.length, errors: out.filter(Boolean) };
+}
+
+// E-mail through Cloudflare Email Routing (free to a verified address). EMAIL_FROM must be on the panel's domain.
+const escHtml = (x) => String(x ?? "").replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+export function saleEmail(m, panel) {
+  const v = m.vars || {};
+  const rows = [
+    ["Produto", v.produto], ["Valor", v.valor], ["Em reais", v.valor_painel], ["Rede", v.rede], ["Origem", v.origem],
+    ["Campanha", v.campanha], ["Anúncio", v.anuncio], ["Pedido", v.pedido], ["Vendas hoje", v.hoje], ["Faturamento hoje", v.total_hoje],
+  ].filter(([, x]) => x);
+  const text = `${m.title}\n${m.body}\n\n${rows.map(([k, x]) => `${k}: ${x}`).join("\n")}\n\nVer no Cutti: ${panel}/sales`;
+  const html = `<!doctype html><html><body style="margin:0;background:#f2f5fa;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0a0a0a">
+<div style="max-width:480px;margin:0 auto;padding:24px 16px">
+<div style="background:linear-gradient(135deg,#0447a8,#02235b);color:#fff;border-radius:16px;padding:20px 22px">
+<div style="font-size:14px;opacity:.9">${escHtml(m.refund ? "Reembolso" : "Nova venda")}</div>
+<div style="font-size:26px;font-weight:700;margin-top:4px">${escHtml(m.title)}</div>
+<div style="font-size:14px;opacity:.9;margin-top:6px">${escHtml(m.body)}</div></div>
+<table style="width:100%;margin-top:16px;background:#fff;border-radius:14px;border-collapse:separate;border-spacing:0;font-size:15px">
+${rows.map(([k, x], i) => `<tr><td style="padding:12px 16px;color:#5b5b63;${i ? "border-top:1px solid #e0e6ef;" : ""}">${escHtml(k)}</td><td style="padding:12px 16px;text-align:right;font-weight:600;${i ? "border-top:1px solid #e0e6ef;" : ""}">${escHtml(x)}</td></tr>`).join("")}
+</table>
+<p style="text-align:center;margin:20px 0"><a href="${escHtml(panel)}/sales" style="display:inline-block;background:#062a6b;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:10px">Ver no Cutti</a></p>
+</div></body></html>`;
+  return { text, html };
+}
+
+async function sendSaleEmail(binding, m, panel) {
+  const { text, html } = saleEmail(m, panel);
+  const from = { email: `vendas@${new URL(panel).hostname.replace(/^app\./, "")}`, name: "Cutti" };
+  await binding.send({ from, subject: m.title, text, html }); // "to" comes from the binding's destination_address
 }
 
 async function telegramConnect(c, token) {
@@ -533,7 +564,7 @@ export async function integrationsPost(c, action) {
     }
   } else if (action === "notify-test") {
     const s = await getSettings(c.db);
-    const r = await notify(c.db, s, messageFrom(s, T.SAMPLE_VARS, false), c.env.__notifyFetch || fetch);
+    const r = await notify(c.db, s, { ...messageFrom(s, T.SAMPLE_VARS, false), vars: T.SAMPLE_VARS }, c.env.__notifyFetch || fetch, { email: c.env.EMAIL, panel: `https://${c.panelHost()}` });
     if (!r.sent) c.flash("error", "Nenhum aviso configurado ainda.");
     else if (r.errors.length) c.flash("error", `Não foi: ${r.errors.join("; ")}`);
     else c.flash("success", "Aviso de teste enviado. Olhe o celular.");

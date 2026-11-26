@@ -594,6 +594,8 @@ class E2E(unittest.TestCase):
         expect(m.get_by_role("button", name="Real")).to_have_attribute("aria-pressed", "true")
         for name in ["ClickBank", "BuyGoods", "Digistore24", "MaxWeb", "GuruMedia", "SmartADV", "SmashLoud", "ClickADV", "MediaScalers", "Hotmart", "Kiwify"]:
             expect(m.get_by_role("switch", name=name)).to_be_visible()
+        expect(m.get_by_role("switch", name="Aviso por e-mail")).to_be_checked()
+        expect(m.get_by_text("voce@exemplo.com")).to_be_visible()
         sw = m.get_by_role("switch", name="Avisar reembolsos")
         was = sw.is_checked()
         m.locator("label.set-switch", has_text="Avisar reembolsos").click()

@@ -101,3 +101,11 @@ test("product comes from the postback, unfilled macros stay out", () => {
   assert.equal(T.parsePostback("hotmart", {}, { event: "PURCHASE_APPROVED", data: { product: { name: "Curso X" }, purchase: { transaction: "H" } } }).product, "Curso X");
   assert.equal(T.parsePostback("kiwify", {}, { order_status: "paid", order_id: "K", Product: { product_name: "Ebook Y" } }).product, "Ebook Y");
 });
+
+test("sale e-mail escapes what the networks send", async () => {
+  const { saleEmail } = await import("../src/tracker-routes.js");
+  const { text, html } = saleEmail({ title: "💰 Venda! US$ 10,00", body: "x", vars: { produto: "<b>Soda</b>", rede: "ClickBank" } }, "https://app.cutti.us");
+  assert.ok(html.includes("&#60;b&#62;Soda"));
+  assert.ok(!html.includes("<b>Soda"));
+  assert.ok(text.includes("Produto: <b>Soda</b>"));
+});

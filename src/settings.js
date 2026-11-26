@@ -10,10 +10,10 @@ export async function settingsPage(c) {
   const s = await freshRates(c, await getSettings(c.db));
   const nets = Object.keys(NETWORKS).filter((n) => n !== "other"); // every network the panel supports
   const devices = (await c.db.prepare("select count(*) as n from push_subs").first()).n;
-  return c.respond(settingsView(c.view(), { s, nets, devices, email: c.user.email }));
+  return c.respond(settingsView(c.view(), { s, nets, devices, email: c.user.email, emailReady: !!c.env.EMAIL, emailTo: c.env.EMAIL_TO || "" }));
 }
 
-function settingsView(c, { s, nets, devices, email }) {
+function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
   const sw = (action, name, on, label, extra = "") => html`
     <form method="post" action="/settings/${action}" class="set-row">
       ${csrfField(c)}${extra}
@@ -55,6 +55,7 @@ function settingsView(c, { s, nets, devices, email }) {
     <button class="btn btn-primary btn-sm" type="button" data-push-enable>Ativar</button>
   </form>
   ${nets.map((n) => sw("mute", "on", !s.notify_muted.includes(n), NETWORKS[n].name, html`<input type="hidden" name="network" value="${n}">`))}
+  ${emailReady ? sw("email", "on", s.email_on, html`Aviso por e-mail<span class="hint">${emailTo}</span>`) : html`<div class="set-row"><span class="set-label">Aviso por e-mail<span class="hint">Falta ativar o envio de e-mail na Cloudflare</span></span></div>`}
   ${sw("refunds", "on", s.notify_refunds, "Avisar reembolsos")}
   <form method="post" action="/integrations/notify-test" class="set-row">${csrfField(c)}
     <button class="set-link" type="submit">Testar aviso</button></form>
@@ -80,6 +81,8 @@ export async function settingsPost(c, action) {
     const after = await freshRates(c, before, { force: true });
     if (after.rate_at && after.rate_at !== before.rate_at) c.flash("success", `Dólar atualizado: R$ ${after.usd_brl.toFixed(4).replace(".", ",")}.`);
     else c.flash("error", "Não consegui buscar a cotação agora. Tente de novo em alguns minutos.");
+  } else if (action === "email") {
+    await setSetting(c.db, "email_on", f.get("on") ? "1" : "0");
   } else if (action === "refunds") {
     await setSetting(c.db, "notify_refunds", f.get("on") ? "1" : "0");
   } else if (action === "mute") {

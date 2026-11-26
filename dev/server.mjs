@@ -22,6 +22,8 @@ env.__ratesFetch = async () => new Response(JSON.stringify({ USDBRL: { bid: "5.4
 
 // Test hook: phone notifications are logged instead of sent.
 if (process.env.TEST_ROUTES) {
+  env.EMAIL_TO = "voce@exemplo.com";
+  env.EMAIL = { send: async (m) => { console.log("EMAIL", m.from?.email, m.subject); return { messageId: "dev" }; } };
   env.__notifyFetch = async (url, init) => {
     console.log("NOTIFY", url.replace(/bot[^/]+/, "bot***"), init?.body);
     return new Response("{}", { status: 200 });
