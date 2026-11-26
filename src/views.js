@@ -36,9 +36,9 @@ function head(title, assetVersion) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>${title} · Cutti</title>
-  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="manifest" href="/static/manifest.webmanifest?v=${assetVersion}">
   <meta name="theme-color" content="#17384c">
-  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon-azul.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Cutti">

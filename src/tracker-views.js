@@ -389,7 +389,7 @@ function templateEditor(c, s) {
   const field = (k, label) => html`<div class="field"><label for="tpl-${k}">${label}</label>
     <input id="tpl-${k}" name="${k}" maxlength="200" value="${t[k]}" data-tpl="${k}" spellcheck="false"></div>`;
   const preview = (kind) => html`<div class="push-preview" data-preview="${kind}">
-    <img src="/static/icon-192.png" alt="" width="36" height="36">
+    <img src="/static/icon-192-azul.png" alt="" width="36" height="36">
     <div><strong data-preview-title>${renderTemplate(t[`${kind}_title`], kind === "sale" ? SAMPLE_VARS : { ...SAMPLE_VARS, emoji: "↩️", tipo: "Reembolso" })}</strong>
     <span data-preview-body>${renderTemplate(t[`${kind}_body`], kind === "sale" ? SAMPLE_VARS : { ...SAMPLE_VARS, emoji: "↩️", tipo: "Reembolso" })}</span></div>
   </div>`;
