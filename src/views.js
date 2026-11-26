@@ -62,7 +62,7 @@ export function page(c, title, body) {
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
     <a class="brand" href="/links">${ICON}<span>Meus links</span></a>
-    <nav>${nav("/results", "Resultados", c.section === "results")}${nav("/sales", "Vendas", c.section === "sales")}${nav("/links", "Links", c.section === "links")}${nav("/integrations", "Integrações", c.section === "integrations")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
+    <nav>${nav("/results", "Resultados", c.section === "results")}${nav("/sales", "Vendas", c.section === "sales")}${nav("/links", "Encurtador de Link", c.section === "links")}${nav("/integrations", "Integrações", c.section === "integrations")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
     <form method="post" action="/logout" class="sidebar-foot">${csrfField(c)}<button class="btn btn-ghost btn-sm" type="submit">Sair</button></form>
   </aside>
   <main class="main" id="main">${flashes(c)}${body}</main>
@@ -288,9 +288,9 @@ export function linksView(c, { rows, total, q, domainFilter, domains, activeDoma
 </div>`;
   }
 
-  return page({ ...c, section: "links" }, "Links", html`
+  return page({ ...c, section: "links" }, "Encurtador de Link", html`
 <header class="page-head">
-  <div><h1 class="h-xl">Links</h1><p class="muted">${total} ${total === 1 ? "link" : "links"}</p></div>
+  <div><h1 class="h-xl">Encurtador de Link</h1><p class="muted">${total} ${total === 1 ? "link" : "links"}</p></div>
   <button class="btn btn-primary" type="button" data-open="new-link">
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     Novo link
@@ -319,7 +319,7 @@ ${list}
 
 export function editView(c, { link, values, errors, activeDomains }) {
   return page({ ...c, section: "links" }, `Editar ${link.slashtag}`, html`
-<nav class="crumbs"><a href="/links">Links</a> <span aria-hidden="true">/</span> <span>${link.domain_name}/${link.slashtag}</span></nav>
+<nav class="crumbs"><a href="/links">Encurtador de Link</a> <span aria-hidden="true">/</span> <span>${link.domain_name}/${link.slashtag}</span></nav>
 <header class="page-head"><h1 class="h-xl">Editar link</h1></header>
 <div class="card pad narrow">
   <p class="muted">Troque o destino quantas vezes quiser. Quem já tem o link, ou um QR impresso, passa a cair no novo endereço.</p>
@@ -349,7 +349,7 @@ export function statsView(c, { link, days, peak, refs, bots, blocked = 0, last30
     return html`<rect x="${i * 10 + 1}" y="${(115 - h).toFixed(1)}" width="8" height="${h > 0 ? h.toFixed(1) : 1}" class="${n ? "bar" : "bar-zero"}"><title>${label}: ${n}</title></rect>`;
   });
   return page({ ...c, section: "links" }, `Cliques em ${link.slashtag}`, html`
-<nav class="crumbs"><a href="/links">Links</a> <span aria-hidden="true">/</span> <span>${link.domain_name}/${link.slashtag}</span></nav>
+<nav class="crumbs"><a href="/links">Encurtador de Link</a> <span aria-hidden="true">/</span> <span>${link.domain_name}/${link.slashtag}</span></nav>
 <header class="page-head">
   <div><h1 class="h-xl">${link.title || `${link.domain_name}/${link.slashtag}`}</h1><p class="muted dest-line">→ ${link.destination}</p></div>
   <div class="row-end">
