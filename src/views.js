@@ -37,8 +37,8 @@ function head(title, assetVersion) {
   <meta name="robots" content="noindex">
   <title>${title} · Cutti</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=${assetVersion}">
-  <meta name="theme-color" content="#17384c">
-  <link rel="apple-touch-icon" href="/static/apple-touch-icon-azul.png">
+  <meta name="theme-color" content="#16394c">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon-16394c.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Cutti">
