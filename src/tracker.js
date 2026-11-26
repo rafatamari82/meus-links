@@ -14,17 +14,17 @@ export function newClickId() {
 // Macros differ per network; the click ID is also found by its format, so a wrong name still works.
 export const NETWORKS = {
   clickbank: { name: "ClickBank", param: "tid", currency: "USD", query: "cid={tid}&amount={affiliate_earnings}&txid={order_id}" },
-  buygoods: { name: "BuyGoods", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}&type={CONV_TYPE}" },
-  digistore24: { name: "Digistore24", param: "cid", currency: "USD", query: "cid={cid}&amount={amount_affiliate}&txid={order_id}&currency={currency}" },
-  maxweb: { name: "MaxWeb", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}" },
-  gurumedia: { name: "GuruMedia", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}" },
-  smartadv: { name: "SmartADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}" },
-  smashloud: { name: "SmashLoud", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={currency}" },
-  clickadv: { name: "ClickADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={conversion_id}&currency={offer_currency}" },
+  buygoods: { name: "BuyGoods", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}&type={CONV_TYPE}&product={PRODUCT_CODENAME}" },
+  digistore24: { name: "Digistore24", param: "cid", currency: "USD", query: "cid={cid}&amount={amount_affiliate}&txid={order_id}&currency={currency}&product={product_name}" },
+  maxweb: { name: "MaxWeb", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}&product={PRODUCT_CODENAME}" },
+  gurumedia: { name: "GuruMedia", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&product={offer_name}" },
+  smartadv: { name: "SmartADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&product={offer_name}" },
+  smashloud: { name: "SmashLoud", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={currency}&product={offer_name}" },
+  clickadv: { name: "ClickADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={conversion_id}&currency={offer_currency}&product={offer_name}" },
   hotmart: { name: "Hotmart", param: "sck", currency: "BRL", json: true },
   kiwify: { name: "Kiwify", param: "sck", currency: "BRL", json: true },
-  medisscalers: { name: "MedisScalers", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&status={status}" },
-  other: { name: "Outra rede", param: "sub1", currency: "USD", query: "cid=SUBID&amount=VALOR&txid=PEDIDO", check: true },
+  medisscalers: { name: "MedisScalers", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&status={status}&product={offer_name}" },
+  other: { name: "Outra rede", param: "sub1", currency: "USD", query: "cid=SUBID&amount=VALOR&txid=PEDIDO&product=PRODUTO", check: true },
 };
 
 export const SOURCES = {
@@ -160,6 +160,7 @@ export function parsePostback(network, fields, json) {
       amount_cents: toCents(amount),
       currency: String(mine?.currency_value || pick(d, "purchase.price.currency_value") || net.currency).toUpperCase().slice(0, 3),
       upsell: pick(d, "purchase.order_bump.is_order_bump") === true,
+      product: cleanProduct(pick(d, "product.name", "product.id")),
     };
   }
 
@@ -176,6 +177,7 @@ export function parsePostback(network, fields, json) {
       ids, type, txid: String(json.order_id || json.order_ref || ""),
       amount_cents: cents == null ? null : Math.round(Number(cents)),
       currency: String(c.currency || c.product_base_price_currency || net.currency).toUpperCase().slice(0, 3),
+      product: cleanProduct(pick(json, "Product.product_name", "product.name", "product_name")),
     };
   }
 
@@ -192,7 +194,17 @@ export function parsePostback(network, fields, json) {
     ids, type: rejected ? "reject" : normType(typeRaw), txid: txid == null ? "" : String(txid).slice(0, 120),
     amount_cents: toCents(amount),
     currency: String(pick(f, "currency", "cur") || net.currency).replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3) || net.currency,
+    product: cleanProduct(pick(f, "product", "product_name", "offer_name", "offer", "product_codename", "item", "sku")
+      ?? (json ? pick(json, "product", "product_name", "offer_name") : null)),
   };
+}
+
+/** Product name as sent, or null when the network left the macro unfilled. */
+export function cleanProduct(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s || /^[{[%]|^\$\{/.test(s)) return null;
+  return s.slice(0, 160);
 }
 
 // ---------------------------------------------------------------- money
@@ -334,9 +346,9 @@ export const PRESELL_JS = `(function(){
 
 export const TEMPLATE_DEFAULTS = {
   sale_title: "{emoji} {tipo}! {valor}",
-  sale_body: "{rede} · {origem} · {campanha} · {anuncio}",
+  sale_body: "{produto} · {rede} · {origem} · {campanha}",
   refund_title: "{emoji} {tipo} {valor}",
-  refund_body: "{rede} · {campanha} · pedido {pedido}",
+  refund_body: "{produto} · {rede} · pedido {pedido}",
 };
 
 export const TEMPLATE_VARS = {
@@ -350,13 +362,14 @@ export const TEMPLATE_VARS = {
   anuncio: "anúncio",
   palavra: "palavra-chave do Google",
   pedido: "número do pedido",
+  produto: "nome do produto (ou da oferta) vendido",
   hoje: "vendas de hoje até agora (contando esta)",
   total_hoje: "faturamento de hoje no painel",
 };
 
 export const SAMPLE_VARS = {
   emoji: "💰", tipo: "Venda", valor: "US$ 87,50", valor_painel: "R$ 472,50", rede: "ClickBank", origem: "Google Ads",
-  campanha: "Campanha exemplo", anuncio: "Anúncio 3", palavra: "receita de bolo", pedido: "ABC123", hoje: "4", total_hoje: "R$ 1.890,00",
+  campanha: "Campanha exemplo", anuncio: "Anúncio 3", produto: "SodaPeak", palavra: "receita de bolo", pedido: "ABC123", hoje: "4", total_hoje: "R$ 1.890,00",
 };
 
 export function cleanTemplate(raw, fallback) {

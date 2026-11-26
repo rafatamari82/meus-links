@@ -118,16 +118,20 @@ export async function postback(c, key, network) {
       .bind(network, p.txid).first();
     if (orig) { p.amount_cents = orig.amount_cents; p.currency = orig.currency; }
   }
+  if (!p.product && p.txid && p.type !== "sale" && p.type !== "upsell") {
+    const orig = await c.db.prepare("select product from tk_conversions where network = ? and txid = ? and product is not null limit 1").bind(network, p.txid).first();
+    if (orig) p.product = orig.product;
+  }
   if (p.type === "sale" && p.upsell) p.type = "upsell";
   const txid = p.txid || (click ? `${click.id}` : `sem-id-${randomToken(6)}`);
   const res = await c.db.prepare(
-    "insert or ignore into tk_conversions (id, click_id, network, txid, type, amount_cents, currency, at) values (?,?,?,?,?,?,?,?)",
-  ).bind(randomToken(12), click?.id || null, network, txid, p.type, Math.abs(p.amount_cents || 0), p.currency || "USD", nowIso()).run();
+    "insert or ignore into tk_conversions (id, click_id, network, txid, type, amount_cents, currency, at, product) values (?,?,?,?,?,?,?,?,?)",
+  ).bind(randomToken(12), click?.id || null, network, txid, p.type, Math.abs(p.amount_cents || 0), p.currency || "USD", nowIso(), p.product || null).run();
   const dup = !res.meta?.changes;
   const outcome = dup ? "repetido" : click ? "ok" : "sem clique";
   const label = { sale: "venda", upsell: "upsell", refund: "reembolso", chargeback: "chargeback" }[p.type];
   await logEvent(c.db, network, outcome,
-    `${label} ${T.fmtMoney(p.amount_cents || 0, p.currency || "USD")}${p.txid ? ` · pedido ${p.txid}` : ""}${click ? ` · clique ${click.id}` : p.ids.length ? ` · click ID ${p.ids[0]} não encontrado` : " · sem click ID"}`,
+    `${label} ${T.fmtMoney(p.amount_cents || 0, p.currency || "USD")}${p.product ? ` · ${p.product}` : ""}${p.txid ? ` · pedido ${p.txid}` : ""}${click ? ` · clique ${click.id}` : p.ids.length ? ` · click ID ${p.ids[0]} não encontrado` : " · sem click ID"}`,
     raw);
 
   // Phone notification.
@@ -170,7 +174,7 @@ async function saleMessage(db, s, network, p, click) {
     valor_painel: T.fmtMoney(T.convert(p.amount_cents || 0, p.currency || "USD", s.currency, s), s.currency),
     rede: T.NETWORKS[network]?.name || network,
     origem: click ? (T.SOURCES[click.source] || click.source) : "sem clique rastreado",
-    campanha, anuncio: click?.ad || "", palavra: click?.keyword || "", pedido: p.txid || "",
+    campanha, anuncio: click?.ad || "", palavra: click?.keyword || "", pedido: p.txid || "", produto: p.product || "",
     hoje: String(hoje), total_hoje: T.fmtMoney(total, s.currency),
   };
   return messageFrom(s, vars, refund);

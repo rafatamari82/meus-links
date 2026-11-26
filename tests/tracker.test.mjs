@@ -73,9 +73,10 @@ test("cost CSV", () => {
 });
 
 test("notification templates", () => {
-  const v = { emoji: "💰", tipo: "Venda", valor: "US$ 10,00", rede: "ClickBank", origem: "Google Ads", campanha: "", anuncio: "A1", pedido: "" };
+  const v = { emoji: "💰", tipo: "Venda", valor: "US$ 10,00", rede: "ClickBank", origem: "Google Ads", campanha: "", anuncio: "A1", pedido: "", produto: "" };
   assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_title, v), "💰 Venda! US$ 10,00");
-  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_body, v), "ClickBank · Google Ads · A1");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_body, v), "ClickBank · Google Ads");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_body, { ...v, produto: "SodaPeak", campanha: "C1" }), "SodaPeak · ClickBank · Google Ads · C1");
   assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.refund_body, v), "ClickBank");
   assert.equal(T.renderTemplate("Caiu {valor} {desconhecida}", v), "Caiu US$ 10,00 {desconhecida}");
   assert.equal(T.cleanTemplate("  ", "x"), "x");
@@ -92,4 +93,11 @@ test("MedisScalers statuses", () => {
   assert.equal(T.parsePostback("medisscalers", { cid: "cteeeeeeeeee", txid: "M1", status: "pending" }, null).type, "sale");
   assert.equal(T.parsePostback("medisscalers", { cid: "cteeeeeeeeee", txid: "M1", status: "rejected" }, null).type, "reject");
   assert.equal(T.parsePostback("medisscalers", { txid: "M1", status: "refunded" }, null).type, "refund");
+});
+
+test("product comes from the postback, unfilled macros stay out", () => {
+  assert.equal(T.parsePostback("gurumedia", { cid: "x", product: "SodaPeak" }, null).product, "SodaPeak");
+  assert.equal(T.parsePostback("buygoods", { cid: "x", product: "{PRODUCT_CODENAME}" }, null).product, null);
+  assert.equal(T.parsePostback("hotmart", {}, { event: "PURCHASE_APPROVED", data: { product: { name: "Curso X" }, purchase: { transaction: "H" } } }).product, "Curso X");
+  assert.equal(T.parsePostback("kiwify", {}, { order_status: "paid", order_id: "K", Product: { product_name: "Ebook Y" } }).product, "Ebook Y");
 });

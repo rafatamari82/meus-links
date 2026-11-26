@@ -73,4 +73,5 @@ export const MIGRATIONS = [
   `alter table links add column network text`,
   `alter table links add column sub_param text`,
   `alter table links add column track_source text`,
+  `alter table tk_conversions add column product text`,
 ];

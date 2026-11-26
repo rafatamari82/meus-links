@@ -125,11 +125,12 @@ export function salesView(c, { s, range, sales, events }) {
 <section class="card table-wrap">
   ${sales.length ? html`
   <table class="links-table">
-    <thead><tr><th scope="col">Quando</th><th scope="col">Tipo</th><th scope="col">Rede</th><th scope="col">Origem</th><th scope="col" class="num">Valor</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <thead><tr><th scope="col">Quando</th><th scope="col">Tipo</th><th scope="col">Produto</th><th scope="col">Rede</th><th scope="col">Origem</th><th scope="col" class="num">Valor</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
     <tbody>${sales.map((v) => html`
       <tr>
         <td data-label="Quando" class="nowrap">${fmtDateTime(v.at)}</td>
         <td data-label="Tipo"><span class="badge ${v.type === "sale" || v.type === "upsell" ? "badge-success" : "badge-warning"}">${TYPE_LABEL[v.type]}</span></td>
+        <td data-label="Produto">${v.product ? html`<strong>${v.product}</strong>` : html`<span class="muted">—</span>`}</td>
         <td data-label="Rede">${NETWORKS[v.network]?.name || v.network}<div class="hint">pedido ${v.txid}</div></td>
         <td data-label="Origem">${v.click_id ? html`${SOURCE_LABEL[v.source] || v.source}<div class="hint">${[v.campaign, v.ad, v.keyword].filter(Boolean).join(" · ") || "sem campanha"}</div>` : html`<span class="muted">Sem clique rastreado</span>`}</td>
         <td data-label="Valor" class="num">${v.type === "refund" || v.type === "chargeback" ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}</td>

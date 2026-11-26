@@ -442,7 +442,7 @@ class E2E(unittest.TestCase):
         self.assertTrue(loc.startswith("https://presell.exemplo.com/bolo?v=2"), loc)
 
         key = self.tracker_key()
-        r = p.request.get(f"{self.base}/pb/{key}/clickbank?cid={cid}&amount=60&txid=CB1")
+        r = p.request.get(f"{self.base}/pb/{key}/clickbank?cid={cid}&amount=60&txid=CB1&product=HoneyBoost")
         self.assertEqual(r.text(), "ok")
         self.assertEqual(p.request.get(f"{self.base}/pb/{key}/clickbank?cid={cid}&amount=60&txid=CB1").text(), "ok (repetido)")
         self.assertEqual(p.request.get(f"{self.base}/pb/nao-e-a-chave/clickbank?cid={cid}").status, 403)
@@ -460,7 +460,9 @@ class E2E(unittest.TestCase):
         expect(p.locator("tr", has_text="77")).to_be_visible()
 
         p.goto(self.base + "/sales?p=today")
-        expect(p.locator("tr", has=p.locator("td[data-label=Tipo]")).filter(has_text="pedido CB1")).to_contain_text("Venda")
+        sale_row = p.locator("tr", has=p.locator("td[data-label=Tipo]")).filter(has_text="pedido CB1")
+        expect(sale_row).to_contain_text("Venda")
+        expect(sale_row.locator("td[data-label=Produto]")).to_have_text("HoneyBoost")
         expect(p.get_by_text(f"clique {cid}").first).to_be_visible()
         csv = p.request.get(f"{self.base}/export/{key}/google.csv").text()
         self.assertIn('"GX","Venda"', csv)
