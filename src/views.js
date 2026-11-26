@@ -62,7 +62,7 @@ export function page(c, title, body) {
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
     <a class="brand" href="/links">${ICON}<span>Meus links</span></a>
-    <nav>${nav("/results", "Resultados", c.section === "results")}${nav("/sales", "Vendas", c.section === "sales")}${nav("/links", "Encurtador de Link", c.section === "links")}${nav("/spy", "Espionar Google", c.section === "spy")}${nav("/integrations", "Integrações", c.section === "integrations")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
+    <nav>${nav("/results", "Resultados", c.section === "results")}${nav("/sales", "Vendas", c.section === "sales")}${nav("/links", "Encurtador de Link", c.section === "links")}${nav("/integrations", "Integrações", c.section === "integrations")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
     <form method="post" action="/logout" class="sidebar-foot">${csrfField(c)}<button class="btn btn-ghost btn-sm" type="submit">Sair</button></form>
   </aside>
   <main class="main" id="main">${flashes(c)}${body}</main>

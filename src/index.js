@@ -13,7 +13,6 @@ import {
 } from "./security.js";
 import * as V from "./views.js";
 import * as TR from "./tracker-routes.js";
-import * as SPY from "./spy.js";
 import { cleanParam, LINK_SOURCES, NETWORKS } from "./tracker.js";
 
 const SESSION_DAYS = 30;
@@ -636,9 +635,6 @@ const PANEL_ROUTES = [
   ["GET", /^\/results$/, TR.resultsPage],
   ["GET", /^\/sales$/, TR.salesPage],
   ["POST", /^\/sales\/([\w-]+)\/delete$/, TR.deleteSale],
-  ["GET", /^\/spy$/, (c) => SPY.spyPage(c)],
-  ["GET", /^\/spy\/go$/, SPY.spyGo],
-  ["POST", /^\/spy\/(domain|deldom-[\w-]+)$/, SPY.spyPost],
   ["GET", /^\/integrations$/, (c) => TR.integrationsPage(c)],
   ["POST", /^\/integrations\/(settings|key|newsbreak-csv|cost|ntfy|telegram|notify-test|notify-prefs|templates|push-subscribe|push-delete-[\w-]+)$/, TR.integrationsPost],
   ["GET", /^\/domains$/, (c) => domainsPage(c)],

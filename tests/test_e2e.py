@@ -561,30 +561,10 @@ class E2E(unittest.TestCase):
         expect(row.locator("td[data-label=Vendas]")).to_have_text("1")
         expect(row).to_contain_text("YouTube")
 
-    def test_s02_simple_country_search(self):
-        p = self.page
-        p.goto(self.base + "/spy")
-        p.get_by_label("Palavra", exact=True).fill("sodapeak review")
-        p.locator("#s-country").select_option(label="Reino Unido")
-        p.locator("label", has_text="Só vídeos").click()
-        with p.expect_popup() as pop:
-            p.get_by_role("button", name="Pesquisar").click()
-        pop.value.close()
-        r = p.request.get(self.base + "/spy/go?q=sodapeak+review&engine=google&country=GB&lang=en&kind=videos")
-        self.assertEqual(r.status, 200)
-        loc = r.headers["x-search-target"]
-        self.assertTrue(loc.startswith("https://www.google.co.uk/search?q=sodapeak+review&gl=gb&hl=en"), loc)
-        self.assertIn("tbm=vid", loc)
-        expect(p.get_by_text("Bing")).to_have_count(0)
-        expect(p.get_by_text("Minhas palavras do dia")).to_have_count(0)
-        p.get_by_label("Site do concorrente").fill("https://concorrente.com/oferta")
-        p.get_by_role("button", name="Adicionar").click()
-        self.assertIn("region=US&domain=concorrente.com", p.get_by_role("link", name="Ver anúncios").get_attribute("href"))
-
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
                                      storage_state=self.ctx.storage_state()).new_page()
-        for path in ["/results", "/sales", "/integrations", "/spy"]:
+        for path in ["/results", "/sales", "/integrations"]:
             m.goto(self.base + path)
             width = m.evaluate("document.documentElement.scrollWidth")
             self.assertLessEqual(width, 390, f"{path} rola para o lado no celular")
