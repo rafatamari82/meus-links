@@ -8,9 +8,7 @@ const chev = raw('<svg class="row-chev" width="18" height="18" viewBox="0 0 24 2
 
 export async function settingsPage(c) {
   const s = await freshRates(c, await getSettings(c.db));
-  const nets = (await c.db.prepare(
-    "select network from links where track = 1 and network is not null union select distinct network from tk_conversions",
-  ).all()).results.map((r) => r.network).filter((n) => NETWORKS[n]);
+  const nets = Object.keys(NETWORKS).filter((n) => n !== "other"); // every network the panel supports
   const devices = (await c.db.prepare("select count(*) as n from push_subs").first()).n;
   return c.respond(settingsView(c.view(), { s, nets, devices, email: c.user.email }));
 }
