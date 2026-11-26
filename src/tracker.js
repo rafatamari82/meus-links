@@ -23,7 +23,7 @@ export const NETWORKS = {
   clickadv: { name: "ClickADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={conversion_id}&currency={offer_currency}&product={offer_name}" },
   hotmart: { name: "Hotmart", param: "sck", currency: "BRL", json: true },
   kiwify: { name: "Kiwify", param: "sck", currency: "BRL", json: true },
-  medisscalers: { name: "MedisScalers", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&status={status}&product={offer_name}" },
+  medisscalers: { name: "MediaScalers", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&status={status}&product={offer_name}" },
   other: { name: "Outra rede", param: "sub1", currency: "USD", query: "cid=SUBID&amount=VALOR&txid=PEDIDO&product=PRODUTO", check: true },
 };
 

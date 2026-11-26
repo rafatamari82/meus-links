@@ -463,6 +463,7 @@ class E2E(unittest.TestCase):
         sale_row = p.locator("tr", has=p.locator("td[data-label=Tipo]")).filter(has_text="pedido CB1")
         expect(sale_row).to_contain_text("Venda")
         expect(sale_row.locator("td[data-label=Produto]")).to_have_text("HoneyBoost")
+        p.locator("summary", has_text="Últimos avisos recebidos").click()
         expect(p.get_by_text(f"clique {cid}").first).to_be_visible()
         csv = p.request.get(f"{self.base}/export/{key}/google.csv").text()
         self.assertIn('"GX","Venda"', csv)
@@ -560,6 +561,20 @@ class E2E(unittest.TestCase):
         row = p.locator("tr", has_text="Vídeo: bolo de cenoura")
         expect(row.locator("td[data-label=Vendas]")).to_have_text("1")
         expect(row).to_contain_text("YouTube")
+
+    def test_t08_app_look_mobile(self):
+        m = self.browser.new_context(viewport={"width": 390, "height": 844},
+                                     storage_state=self.ctx.storage_state()).new_page()
+        m.goto(self.base + "/results")
+        bar = m.get_by_role("navigation", name="Navegação principal")
+        expect(bar).to_be_visible()
+        expect(bar.get_by_role("link", name="Início")).to_have_attribute("aria-current", "page")
+        expect(m.locator(".kpi-hero")).to_contain_text("Faturamento")
+        bar.get_by_role("link", name="Vendas").click()
+        expect(m.get_by_role("heading", name="Vendas", exact=True)).to_be_visible()
+        bar.get_by_role("link", name="Ajustes").click()
+        expect(m.get_by_role("link", name="Domínios")).to_be_visible()
+        m.context.close()
 
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},

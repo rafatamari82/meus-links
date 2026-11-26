@@ -7,6 +7,7 @@ const TYPE_LABEL = { sale: "Venda", upsell: "Upsell", refund: "Reembolso", charg
 const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(1).replace(".", ",")}%` : "—");
 const ratio = (x) => (x == null ? "—" : `${x.toFixed(2).replace(".", ",")}x`);
 const ddmm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+const RANGE_LABEL = { today: "Hoje", yesterday: "Ontem", "7d": "Últimos 7 dias", "30d": "Últimos 30 dias", month: "Este mês" };
 
 function rangeForm(range, extra = {}) {
   const opt = (v, l) => html`<option value="${v}" ${range.preset === v ? raw("selected") : ""}>${l}</option>`;
@@ -20,8 +21,9 @@ function rangeForm(range, extra = {}) {
   <span class="range-custom" ${range.preset === "custom" ? "" : raw("hidden")}>
     <label class="sr-only" for="from">De</label><input id="from" name="from" type="date" value="${range.from}">
     <label class="sr-only" for="to">Até</label><input id="to" name="to" type="date" value="${range.to}">
+    <button class="btn btn-secondary" type="submit">Ver</button>
   </span>
-  <button class="btn btn-secondary" type="submit">Ver</button>
+  <noscript><button class="btn btn-secondary" type="submit">Ver</button></noscript>
 </form>`;
 }
 
@@ -48,7 +50,7 @@ function chart(series, cur) {
 <tbody>${series.map((x) => html`<tr><th scope="row">${ddmm(x.d)}</th><td>${fmtMoney(x.rev, cur)}</td><td>${fmtMoney(x.cost, cur)}</td></tr>`)}</tbody></table>`;
 }
 
-export function resultsView(c, { s, range, byAd, srcFilter, list, tot, series, hasAny, sources = [] }) {
+export function resultsView(c, { s, range, byAd, srcFilter, list, tot, series, hasAny, sources = [], networks = [] }) {
   const cur = s.currency;
   const m = (x) => (x == null ? "—" : fmtMoney(x, cur));
   const tab = (label, params, on) => html`<a class="tab ${on ? "is-current" : ""}" href="/results?${new URLSearchParams(params)}" ${on ? raw('aria-current="page"') : ""}>${label}</a>`;
@@ -62,23 +64,32 @@ export function resultsView(c, { s, range, byAd, srcFilter, list, tot, series, h
   <a class="btn btn-primary" href="/integrations">Abrir Integrações</a>
 </div>` : "";
   return page({ ...c, section: "results" }, "Resultados", html`
-<header class="page-head">
-  <div><h1 class="h-xl">Resultados</h1><p class="muted">${ddmm(range.from)} a ${ddmm(range.to)} · valores em ${cur}</p></div>
+<header class="page-head dash-head">
+  <div><h1 class="h-xl">${RANGE_LABEL[range.preset] || `${ddmm(range.from)} a ${ddmm(range.to)}`}</h1><p class="muted">Valores em ${cur}${srcFilter ? ` · ${SOURCE_LABEL[srcFilter] || srcFilter}` : ""}</p></div>
   ${rangeForm(range, { ...withBy, ...withSrc })}
 </header>
 ${empty}
-<div class="stats-grid">
-  ${stat("Faturamento", m(tot.revenue))}
-  ${stat("Gasto", m(tot.cost))}
-  ${stat("Lucro", m(tot.profit), tot.profit < 0 ? "neg" : tot.profit > 0 ? "pos" : "")}
-  ${stat("ROAS", ratio(tot.roas))}
+<div class="kpis">
+  <div class="kpi kpi-hero"><p class="kpi-label">Faturamento</p><p class="kpi-value">${m(tot.revenue)}</p></div>
+  <div class="kpi kpi-dark"><p class="kpi-label">Vendas</p><p class="kpi-value">${tot.sales}</p></div>
+  <div class="kpi kpi-outline"><p class="kpi-label">Reembolsos</p><p class="kpi-value">${tot.refunds}</p></div>
 </div>
-<div class="stats-grid">
-  ${stat("Vendas", tot.sales)}
-  ${stat("CPA", m(tot.cpa))}
-  ${stat("Cliques", tot.clicks)}
-  ${stat("Conversão", pct(tot.trackedSales, tot.clicks))}
+<div class="kpis-mini">
+  <div class="kpi-mini"><p class="kpi-label">Gasto</p><p>${m(tot.cost)}</p></div>
+  <div class="kpi-mini"><p class="kpi-label">Lucro</p><p class="${tot.profit < 0 ? "neg" : tot.profit > 0 ? "pos" : ""}">${m(tot.profit)}</p></div>
+  <div class="kpi-mini"><p class="kpi-label">ROAS</p><p>${ratio(tot.roas)}</p></div>
+  <div class="kpi-mini"><p class="kpi-label">CPA</p><p>${m(tot.cpa)}</p></div>
+  <div class="kpi-mini"><p class="kpi-label">Cliques</p><p>${tot.clicks}</p></div>
+  <div class="kpi-mini"><p class="kpi-label">Conversão</p><p>${pct(tot.trackedSales, tot.clicks)}</p></div>
 </div>
+${networks.length ? html`<section aria-labelledby="by-net"><h2 class="h-lg" id="by-net">Por rede</h2>
+<div class="net-cards">${networks.map((n) => html`
+  <a class="net-card" href="/sales?${new URLSearchParams({ ...base, network: n.network })}">
+    <span class="net-name"><span class="net-mark" aria-hidden="true">${(NETWORKS[n.network]?.name || n.network).slice(0, 1)}</span>${NETWORKS[n.network]?.name || n.network}</span>
+    <span class="net-value">${m(n.revenue)}</span>
+    <span class="net-sub">${n.sales} ${n.sales === 1 ? "venda" : "vendas"} · ${n.refunds} ${n.refunds === 1 ? "reembolso" : "reembolsos"}</span>
+    <svg class="net-chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+  </a>`)}</div></section>` : ""}
 <section class="card pad">
   <h2 class="h-lg">Por dia</h2>
   ${chart(series, cur)}
@@ -116,13 +127,27 @@ ${empty}
 </section>`);
 }
 
-export function salesView(c, { s, range, sales, events }) {
+export function salesView(c, { s, range, sales, events, network = "" }) {
   return page({ ...c, section: "sales" }, "Vendas", html`
 <header class="page-head">
-  <div><h1 class="h-xl">Vendas</h1><p class="muted">${sales.length} registro(s) de ${ddmm(range.from)} a ${ddmm(range.to)}</p></div>
-  ${rangeForm(range)}
+  <div><h1 class="h-xl">Vendas</h1><p class="muted">${sales.length} registro(s) · ${RANGE_LABEL[range.preset] || `${ddmm(range.from)} a ${ddmm(range.to)}`}</p></div>
+  ${rangeForm(range, network ? { network } : {})}
 </header>
-<section class="card table-wrap">
+${network ? html`<p><a class="chip-filter" href="/sales?${new URLSearchParams({ p: range.preset, ...(range.preset === "custom" ? { from: range.from, to: range.to } : {}) })}">${NETWORKS[network]?.name || network} <span aria-hidden="true">✕</span><span class="sr-only">tirar filtro</span></a></p>` : ""}
+${sales.length ? html`<ul class="sale-list" aria-label="Vendas">${sales.map((v) => {
+  const neg = v.type === "refund" || v.type === "chargeback";
+  return html`<li class="sale-item">
+    <div class="sale-main">
+      <strong>${v.product || NETWORKS[v.network]?.name || v.network}</strong>
+      <span class="hint">${fmtDateTime(v.at)} · ${NETWORKS[v.network]?.name || v.network}${v.click_id ? ` · ${SOURCE_LABEL[v.source] || v.source}${v.campaign ? ` · ${v.campaign}` : ""}` : ""}</span>
+    </div>
+    <div class="sale-side">
+      <span class="sale-amount ${neg ? "neg" : ""}">${neg ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}</span>
+      <span class="badge ${neg ? "badge-warning" : "badge-success"}">${TYPE_LABEL[v.type]}</span>
+    </div>
+  </li>`;
+})}</ul>` : ""}
+<section class="card table-wrap sales-table-wrap">
   ${sales.length ? html`
   <table class="links-table">
     <thead><tr><th scope="col">Quando</th><th scope="col">Tipo</th><th scope="col">Produto</th><th scope="col">Rede</th><th scope="col">Origem</th><th scope="col" class="num">Valor</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
@@ -138,15 +163,15 @@ export function salesView(c, { s, range, sales, events }) {
       </tr>`)}</tbody>
   </table>` : html`<p class="muted pad">Nenhuma venda neste período.</p>`}
 </section>
-<section class="card pad">
-  <h2 class="h-lg">Últimos avisos recebidos</h2>
+<details class="card pad events-box">
+  <summary class="h-lg">Últimos avisos recebidos</summary>
   <p class="hint">Tudo o que as redes e o Google Ads mandaram, inclusive o que foi ignorado. Use para conferir se a integração está certa.</p>
   ${events.length ? html`<table class="simple events"><tbody>${events.map((e) => html`
     <tr><td class="nowrap">${fmtDateTime(e.at)}</td><td>${NETWORKS[e.network]?.name || e.network}</td>
       <td><span class="badge ${e.outcome === "ok" ? "badge-success" : "badge-warning"}">${e.outcome}</span></td>
       <td>${e.detail}${e.raw ? html`<details class="raw"><summary>ver dados</summary><pre>${e.raw}</pre></details>` : ""}</td></tr>`)}</tbody></table>`
     : html`<p class="muted">Nada recebido ainda.</p>`}
-</section>`);
+</details>`);
 }
 
 function copyBox(id, label, value, rows = 0) {
@@ -167,7 +192,8 @@ export function integrationsView(c, { s, base, linkDomain, costCount, settingsEr
   const gTemplate = `https://${linkDomain}/SEU-LINK?src=google&cmp={campaignid}&adg={adgroupid}&ad={creative}&kw={keyword}&gclid={gclid}&lp={lpurl}`;
   const nbUrl = `https://${linkDomain}/SEU-LINK?src=newsbreak&cmp=__CAMPAIGN_NAME__&adg=__FLIGHT_NAME__&ad=__CREATIVE_NAME__&nbcb=__CALLBACK_PARAM__`;
   return page({ ...c, section: "integrations" }, "Integrações", html`
-<header class="page-head"><div><h1 class="h-xl">Integrações</h1><p class="muted">Como o clique do anúncio chega até a venda.</p></div></header>
+<header class="page-head"><div><h1 class="h-xl">Integrações</h1><p class="muted">Como o clique do anúncio chega até a venda.</p></div>
+  <a class="btn btn-secondary btn-sm" href="/domains">Domínios</a></header>
 
 <section class="card pad">
   <h2 class="h-lg">Como funciona</h2>
@@ -279,7 +305,7 @@ const WHERE = {
   smartadv: "No painel da SmartADV, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1.",
   smashloud: "No painel da SmashLoud, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1.",
   clickadv: "No painel da ClickADV, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1. O valor é a sua comissão, não o preço da venda.",
-  medisscalers: "No painel da MedisScalers, campo de postback (onde está o da outra ferramenta). O código do clique vai em sub1. Conversão pendente conta como venda; se depois vier recusada, ela é descontada.",
+  medisscalers: "No painel da MediaScalers, campo de postback (onde está o da outra ferramenta). O código do clique vai em sub1. Conversão pendente conta como venda; se depois vier recusada, ela é descontada.",
   hotmart: "Ferramentas → Webhook → Cadastrar. Eventos: compra aprovada, reembolso, chargeback. O código vai no sck (ou src, como afiliado).",
   kiwify: "Apps → Webhooks → Criar webhook. Eventos: compra aprovada, reembolso, chargeback.",
 };

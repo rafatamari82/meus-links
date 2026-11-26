@@ -61,20 +61,38 @@ export function page(c, title, body) {
 <body class="panel">
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
-    <a class="brand" href="/links">${ICON}<span>Meus links</span></a>
+    <a class="brand" href="/results">${ICON}<span>Cutti</span></a>
     <nav>${nav("/results", "Resultados", c.section === "results")}${nav("/sales", "Vendas", c.section === "sales")}${nav("/links", "Encurtador de Link", c.section === "links")}${nav("/integrations", "Integrações", c.section === "integrations")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
     <form method="post" action="/logout" class="sidebar-foot">${csrfField(c)}<button class="btn btn-ghost btn-sm" type="submit">Sair</button></form>
   </aside>
   <main class="main" id="main">${flashes(c)}${body}</main>
 </div>
+<nav class="tabbar" aria-label="Navegação principal">
+  ${tabItem("/results", "Início", TAB_ICONS.home, c.section === "results")}
+  ${tabItem("/sales", "Vendas", TAB_ICONS.list, c.section === "sales")}
+  ${tabItem("/links", "Links", TAB_ICONS.link, c.section === "links")}
+  ${tabItem("/integrations", "Ajustes", TAB_ICONS.gear, ["integrations", "domains"].includes(c.section))}
+</nav>
 <div class="sr-only" aria-live="polite" id="live"></div>
 </body></html>`.s;
+}
+
+// Bottom tab bar on phones. Icons drawn for this app (simple strokes).
+const svg = (d) => raw(`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`);
+const TAB_ICONS = {
+  home: svg('<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9h11v-9"/><path d="M10 19v-5h4v5"/>'),
+  list: svg('<path d="M9 7h11M9 12h11M9 17h11"/><circle cx="4.5" cy="7" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="17" r="1"/>'),
+  link: svg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
+  gear: svg('<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>'),
+};
+function tabItem(href, label, icon, active) {
+  return html`<a href="${href}" class="tab-item ${active ? "is-current" : ""}" ${active ? raw('aria-current="page"') : ""}>${icon}<span>${label}</span></a>`;
 }
 
 function authPage(c, title, body) {
   return html`${head(title, c.assetVersion)}
 <body class="auth"><main class="auth-card" id="main">
-  <div class="brand brand-center">${ICON}<span>Meus links</span></div>
+  <div class="brand brand-center">${ICON}<span>Cutti</span></div>
   ${body}
 </main></body></html>`.s;
 }

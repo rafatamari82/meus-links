@@ -80,6 +80,7 @@ async function logEvent(db, network, outcome, detail, raw) {
 export async function postback(c, key, network) {
   const s = await checkKey(c, key);
   if (!s) return text("chave inválida", 403);
+  if (network === "mediascalers") network = "medisscalers"; // the right spelling also works
   network = T.NETWORKS[network] ? network : "other";
   const fields = Object.fromEntries(c.url.searchParams);
   let json = null;
@@ -409,20 +410,38 @@ export async function resultsPage(c) {
   const series = days.map((d) => ({ d, rev: dayRev[d], cost: dayCost[d] }));
 
   const hasAny = (await db.prepare("select (select count(*) from tk_clicks) + (select count(*) from tk_conversions) + (select count(*) from tk_costs) as n").first()).n;
+  // Per network, for the cards: networks of tracked links plus any that sent a sale in the period.
+  const netRows = (await db.prepare(
+    `select v.network, v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
+     from tk_conversions v left join tk_clicks k on k.id = v.click_id
+     where v.at >= ? and v.at < ?${srcSql} group by v.network, v.type, v.currency`,
+  ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : [])).all()).results;
+  const nets = new Map();
+  for (const r of (await db.prepare("select distinct network from links where track = 1 and network is not null").all()).results) {
+    nets.set(r.network, { network: r.network, revenue: 0, sales: 0, refunds: 0 });
+  }
+  for (const r of netRows) {
+    if (!nets.has(r.network)) nets.set(r.network, { network: r.network, revenue: 0, sales: 0, refunds: 0 });
+    const x = nets.get(r.network);
+    if (r.type === "sale" || r.type === "upsell") x.sales += r.n; else x.refunds += r.n;
+    x.revenue += sumRev(r.type, conv(r.cents, r.currency));
+  }
+  const networks = [...nets.values()].sort((a, b) => b.revenue - a.revenue || b.sales - a.sales);
   const sources = (await db.prepare("select distinct source from tk_clicks").all()).results.map((r) => r.source);
   if (srcFilter && !sources.includes(srcFilter)) sources.push(srcFilter);
-  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, list, tot, series, hasAny, sources }));
+  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, list, tot, series, hasAny, sources, networks }));
 }
 
 export async function salesPage(c) {
   const s = await getSettings(c.db);
   const range = readRange(c.url.searchParams);
+  const network = T.NETWORKS[c.url.searchParams.get("network")] ? c.url.searchParams.get("network") : "";
   const sales = (await c.db.prepare(
     `select v.*, k.source, k.campaign, k.ad, k.keyword from tk_conversions v left join tk_clicks k on k.id = v.click_id
-     where v.at >= ? and v.at < ? order by v.at desc limit 300`,
-  ).bind(range.start, range.end).all()).results;
+     where v.at >= ? and v.at < ?${network ? " and v.network = ?" : ""} order by v.at desc limit 300`,
+  ).bind(range.start, range.end, ...(network ? [network] : [])).all()).results;
   const events = (await c.db.prepare("select * from tk_events order by id desc limit 40").all()).results;
-  return c.respond(TV.salesView(c.view(), { s, range, sales, events }));
+  return c.respond(TV.salesView(c.view(), { s, range, sales, events, network }));
 }
 
 export async function integrationsPage(c, extra = {}, status = 200) {
