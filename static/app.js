@@ -47,6 +47,24 @@
   });
   document.addEventListener("change", function (e) {
     if (e.target.matches("[data-autosubmit]")) e.target.form.submit();
+    if (e.target.matches("[data-geo-mode]")) {
+      var picker = e.target.closest("details").querySelector(".geo-picker");
+      if (picker) picker.hidden = e.target.value === "off";
+    }
+    if (e.target.matches("input[name=geo_countries]")) {
+      var box = e.target.closest(".geo-picker");
+      var n = box.querySelectorAll("input[name=geo_countries]:checked").length;
+      var out = box.querySelector("[data-geo-count]");
+      if (out) out.textContent = n;
+    }
+  });
+  document.addEventListener("input", function (e) {
+    if (!e.target.matches("[data-geo-filter]")) return;
+    var q = e.target.value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    e.target.closest(".geo-picker").querySelectorAll(".geo-item").forEach(function (item) {
+      var name = item.getAttribute("data-name").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      item.hidden = q && name.indexOf(q) < 0;
+    });
   });
   document.addEventListener("DOMContentLoaded", function () {
     var d = document.querySelector("dialog[data-open-on-load]");

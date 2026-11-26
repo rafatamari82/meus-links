@@ -174,6 +174,10 @@ async function serveShort(c, slashtag) {
     return c.respond(V.publicNotFound(ASSET_VERSION), 404);
   }
 
+  // Cloudflare fills request.cf; the header is only a fallback for local runs.
+  const country = (c.req.cf?.country || (c.req.cf ? "" : c.req.headers.get("CF-IPCountry")) || "").toUpperCase().slice(0, 2) || null;
+  const allowed = core.geoAllows(link.geo_mode, link.geo_countries, country);
+
   let target = link.destination;
   if (link.forward_parameters) target = core.forwardQuery(target, c.url.search);
 
@@ -186,17 +190,21 @@ async function serveShort(c, slashtag) {
       ref = new URL(c.req.headers.get("Referer") || "").hostname || null;
     } catch { /* no referrer */ }
     const ts = now();
-    // Cloudflare fills request.cf; the header is only a fallback for local runs.
-    const country = (c.req.cf?.country || (c.req.cf ? "" : c.req.headers.get("CF-IPCountry")) || "").toUpperCase().slice(0, 2) || null;
     const { device, os } = core.parseDevice(ua);
     const writes = [db.prepare(
-      "insert into clicks (link_id, at, referrer_host, user_agent, is_bot, country, device, os) values (?,?,?,?,?,?,?,?)",
-    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os)];
-    if (!bot) {
+      "insert into clicks (link_id, at, referrer_host, user_agent, is_bot, country, device, os, blocked) values (?,?,?,?,?,?,?,?,?)",
+    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, allowed ? 0 : 1)];
+    if (!bot && allowed) {
       writes.push(db.prepare("update links set clicks = clicks + 1, last_click_at = ? where id = ?").bind(ts, link.id));
     }
     // Record after answering: the visitor never waits for the database.
     c.exec.waitUntil(db.batch(writes).catch((e) => console.error("click not recorded", e)));
+  }
+  if (!allowed) {
+    return new Response(V.geoBlocked(ASSET_VERSION), {
+      status: 403,
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" },
+    });
   }
   return new Response(null, {
     status: 302,
@@ -260,7 +268,16 @@ async function readLinkForm(c) {
     .bind(values.domain_id, c.user.id).first();
   if (!domain) errors.domain_id = "Escolha um domínio ativo.";
   const title = values.title.trim().slice(0, 200) || null;
-  return { values, errors, dest, slug, domain, title };
+  values.geo_mode = String(f.get("geo_mode") || "off");
+  values.geo_countries = f.getAll("geo_countries").map(String).join(",");
+  let geo = { mode: "off", countries: "" };
+  try {
+    geo = core.cleanGeo(values.geo_mode, f.getAll("geo_countries"));
+  } catch (e) {
+    if (!(e instanceof core.ValidationError)) throw e;
+    errors[e.field] = e.message;
+  }
+  return { values, errors, dest, slug, domain, title, geo };
 }
 
 async function listLinks(c, q = "", domainFilter = "") {
@@ -352,7 +369,7 @@ async function linksPage(c) {
 }
 
 async function createLink(c) {
-  const { values, errors, dest, slug, domain, title } = await readLinkForm(c);
+  const { values, errors, dest, slug, domain, title, geo } = await readLinkForm(c);
   if (!Object.keys(errors).length) {
     const ts = now();
     const id = newId();
@@ -361,8 +378,8 @@ async function createLink(c) {
       const s = slug || core.randomSlug();
       try {
         await c.db.prepare(
-          "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, created_at, updated_at) values (?,?,?,?,?,?,?,?,?)",
-        ).bind(id, c.user.id, domain.id, s, s.toLowerCase(), dest, title, ts, ts).run();
+          "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, geo_mode, geo_countries, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?)",
+        ).bind(id, c.user.id, domain.id, s, s.toLowerCase(), dest, title, geo.mode, geo.countries, ts, ts).run();
         c.flash("success", "Link criado.");
         return c.redirect(`/links?new=${id}`);
       } catch (e) {
@@ -382,7 +399,10 @@ async function createLink(c) {
 async function editLink(c, id) {
   const link = await getLink(c, id);
   if (!link) return notFound(c);
-  let values = { destination: link.destination, slashtag: link.slashtag, title: link.title || "", domain_id: link.domain_id };
+  let values = {
+    destination: link.destination, slashtag: link.slashtag, title: link.title || "", domain_id: link.domain_id,
+    geo_mode: link.geo_mode || "off", geo_countries: link.geo_countries || "",
+  };
   let errors = {};
   if (c.req.method === "POST") {
     const r = await readLinkForm(c);
@@ -392,8 +412,8 @@ async function editLink(c, id) {
     if (!Object.keys(errors).length) {
       try {
         await c.db.prepare(
-          "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, updated_at = ? where id = ? and user_id = ?",
-        ).bind(r.dest, r.slug, r.slug.toLowerCase(), r.title, r.domain.id, now(), id, c.user.id).run();
+          "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, geo_mode = ?, geo_countries = ?, updated_at = ? where id = ? and user_id = ?",
+        ).bind(r.dest, r.slug, r.slug.toLowerCase(), r.title, r.domain.id, r.geo.mode, r.geo.countries, now(), id, c.user.id).run();
         c.flash("success", "Alterações salvas.");
         return c.redirect("/links");
       } catch (e) {
@@ -421,7 +441,7 @@ async function linkStats(c, id) {
   const keys = [];
   for (let i = 29; i >= 0; i--) keys.push(dayKey(new Date(today.getTime() - i * 864e5)));
   const since = new Date(today.getTime() - 31 * 864e5).toISOString();
-  const rows = (await c.db.prepare("select at from clicks where link_id = ? and is_bot = 0 and at >= ?")
+  const rows = (await c.db.prepare("select at from clicks where link_id = ? and is_bot = 0 and blocked = 0 and at >= ?")
     .bind(id, since).all()).results;
   const counts = Object.fromEntries(keys.map((k) => [k, 0]));
   for (const r of rows) {
@@ -430,18 +450,19 @@ async function linkStats(c, id) {
   }
   const days = keys.map((k) => [`${k.slice(8, 10)}/${k.slice(5, 7)}`, counts[k]]);
   const refs = (await c.db.prepare(
-    "select coalesce(referrer_host, 'Direto ou desconhecido') as ref, count(*) as n from clicks where link_id = ? and is_bot = 0 group by ref order by n desc limit 10",
+    "select coalesce(referrer_host, 'Direto ou desconhecido') as ref, count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 0 group by ref order by n desc limit 10",
   ).bind(id).all()).results;
   const bots = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 1").bind(id).first()).n;
+  const blocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 1").bind(id).first()).n;
   const breakdown = async (col) => (await c.db.prepare(
-    `select coalesce(${col}, '') as k, count(*) as n from clicks where link_id = ? and is_bot = 0 group by k order by n desc limit 10`,
+    `select coalesce(${col}, '') as k, count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 0 group by k order by n desc limit 10`,
   ).bind(id).all()).results;
   const countries = (await breakdown("country")).map((r) => ({ label: core.countryName(r.k), n: r.n }));
   const devices = (await breakdown("device")).map((r) => ({ label: core.DEVICE_LABELS[r.k] || "Desconhecido", n: r.n }));
   const systems = (await breakdown("os")).map((r) => ({ label: r.k || "Desconhecido", n: r.n }));
   const last30 = days.reduce((a, [, n]) => a + n, 0);
   return c.respond(V.statsView(c.view(), {
-    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, last30, countries, devices, systems,
+    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, last30, countries, devices, systems,
   }));
 }
 

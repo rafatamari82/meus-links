@@ -1,4 +1,5 @@
 // HTML views. Every interpolated value is escaped unless wrapped in raw().
+import { countryName, countryOptions } from "./core.js";
 
 class Raw {
   constructor(s) { this.s = s; }
@@ -119,6 +120,33 @@ export function publicNotFound(assetVersion) {
 </main></body></html>`.s;
 }
 
+let OPTIONS = null;
+function geoFields(v, e) {
+  OPTIONS ??= countryOptions();
+  const mode = v.geo_mode || "off";
+  const chosen = new Set(String(v.geo_countries || "").split(",").filter(Boolean));
+  const radio = (val, label) => html`<label class="check"><input type="radio" name="geo_mode" value="${val}" ${mode === val ? raw("checked") : ""} data-geo-mode> ${label}</label>`;
+  return html`
+<details class="utm geo" ${mode !== "off" || e.geo ? raw("open") : ""}>
+  <summary>Países ${mode === "off" ? "" : html`<span class="badge badge-warning">${mode === "block" ? "bloqueando" : "só liberados"}: ${chosen.size}</span>`}</summary>
+  <fieldset class="geo-modes" ${e.geo ? raw('aria-describedby="geo-err"') : ""}>
+    <legend class="sr-only">Onde o link funciona</legend>
+    ${radio("off", "Funciona em todos os países")}
+    ${radio("block", "Bloquear os países marcados")}
+    ${radio("allow", "Funcionar só nos países marcados")}
+  </fieldset>
+  ${fieldError("geo-err", e.geo)}
+  <div class="geo-picker" ${mode === "off" ? raw("hidden") : ""}>
+    <label class="sr-only" for="geo-filter">Procurar país</label>
+    <input id="geo-filter" type="search" placeholder="Procurar país…" data-geo-filter autocomplete="off">
+    <p class="hint"><span data-geo-count>${chosen.size}</span> marcado(s). Quem estiver num país bloqueado vê “Oi, curioso! Aqui não.”</p>
+    <div class="geo-list" role="group" aria-label="Países">
+      ${OPTIONS.map(([code, name]) => html`<label class="check geo-item" data-name="${name.toLowerCase()} ${code.toLowerCase()}"><input type="checkbox" name="geo_countries" value="${code}" ${chosen.has(code) ? raw("checked") : ""}> ${name}</label>`)}
+    </div>
+  </div>
+</details>`;
+}
+
 function linkFields(values, errors, domains, editing) {
   const v = values || {};
   const e = errors || {};
@@ -158,7 +186,13 @@ function linkFields(values, errors, domains, editing) {
     <div class="field"><label for="utm_medium">Meio</label><input id="utm_medium" name="utm_medium" maxlength="100" placeholder="bio" value="${v.utm_medium}"></div>
     <div class="field"><label for="utm_campaign">Campanha</label><input id="utm_campaign" name="utm_campaign" maxlength="100" placeholder="black-friday" value="${v.utm_campaign}"></div>
   </div>
-</details>`;
+</details>
+${geoFields(v, e)}`;
+}
+
+function geoSummary(codes) {
+  const list = String(codes || "").split(",").filter(Boolean).map(countryName);
+  return list.length <= 3 ? list.join(", ") : `${list.slice(0, 3).join(", ")} e mais ${list.length - 3}`;
 }
 
 export function linksView(c, { rows, total, q, domainFilter, domains, activeDomains, newId,
@@ -188,6 +222,7 @@ export function linksView(c, { rows, total, q, domainFilter, domains, activeDoma
     <tr class="${l.id === newId ? "is-new" : ""}" data-link-id="${l.id}">
       <td data-label="Link">
         ${l.title ? html`<div class="link-title">${l.title}</div>` : ""}
+        ${l.geo_mode && l.geo_mode !== "off" ? html`<div class="hint">${l.geo_mode === "block" ? "Bloqueado em" : "Só funciona em"} ${geoSummary(l.geo_countries)}</div>` : ""}
         <div class="short-row">
           <a class="short-url" href="${shortUrl(l)}" target="_blank" rel="noopener">${l.domain_name}/${l.slashtag}</a>
           <button class="btn btn-ghost btn-xs" type="button" data-copy="${shortUrl(l)}" aria-label="Copiar ${l.domain_name}/${l.slashtag}">Copiar</button>
@@ -274,7 +309,7 @@ function breakdownCard(title, rows, total) {
 </section>`;
 }
 
-export function statsView(c, { link, days, peak, refs, bots, last30, countries = [], devices = [], systems = [] }) {
+export function statsView(c, { link, days, peak, refs, bots, blocked = 0, last30, countries = [], devices = [], systems = [] }) {
   const su = `${c.scheme}://${link.domain_name}/${link.slashtag}`;
   const bars = days.map(([label, n], i) => {
     const h = n ? (n / peak) * 110 : 0;
@@ -312,6 +347,7 @@ export function statsView(c, { link, days, peak, refs, bots, last30, countries =
   <p class="hint">Instagram, WhatsApp e TikTok costumam não informar a origem: esses cliques aparecem como “Direto ou desconhecido”. Para separar canais, crie um link para cada lugar.</p>
   ${refs.length ? html`<table class="simple"><thead><tr><th scope="col">Origem</th><th scope="col" class="num">Cliques</th></tr></thead>
   <tbody>${refs.map((r) => html`<tr><td>${r.ref}</td><td class="num">${r.n}</td></tr>`)}</tbody></table>` : html`<p class="muted">Nada ainda.</p>`}
+  ${blocked ? html`<p class="hint">${blocked} ${blocked === 1 ? "acesso de país bloqueado foi barrado e não entrou" : "acessos de países bloqueados foram barrados e não entraram"} na contagem.</p>` : ""}
   ${bots ? html`<p class="hint">${bots} ${bots === 1 ? "acesso de robôs e prévias de redes sociais não entrou" : "acessos de robôs e prévias de redes sociais não entraram"} na contagem.</p>` : ""}
 </section>`);
 }
@@ -367,4 +403,15 @@ export function domainsView(c, { domains, counts, error, value, panelHost }) {
   </form>
   <p class="hint">Painel: ${panelHost}</p>
 </section>`);
+}
+
+export function geoBlocked(assetVersion) {
+  return html`<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>Aqui não</title>
+<link rel="stylesheet" href="/static/tokens.css?v=${assetVersion}"><link rel="stylesheet" href="/static/app.css?v=${assetVersion}"></head>
+<body class="auth"><main class="auth-card center">
+<p class="geo-emoji" aria-hidden="true">👀</p>
+<h1 class="h-lg">Oi, curioso! Aqui não.</h1>
+</main></body></html>`.s;
 }

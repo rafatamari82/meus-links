@@ -13,7 +13,7 @@ Connect a custom domain via DNS,domains,must,yes,yes,
 Automatic HTTPS on custom domains,domains,must,yes,partial,Cloudflare Workers Custom Domains issue DNS + cert; confirm on first real deploy
 Service domain for users without their own,domains,must,yes,yes,the app host doubles as the default short domain
 Link stats: clicks over time,analytics,should,yes,yes,
-Link stats: country device referrer,analytics,should,yes,partial,referrer only; country/device not yet
+Link stats: country device referrer,analytics,should,yes,yes,"country (Cloudflare), device, OS, referrer"
 Bot and link-preview filtering,analytics,should,yes,yes,
 Tags on links and filter by tag,organization,should,yes,no,
 Favourite links,organization,should,yes,no,
@@ -30,7 +30,7 @@ Export links to CSV,links,could,yes,no,
 UTM presets,links,could,yes,no,
 Public API with API keys,api,could,yes,no,
 Workspaces and teammates,team,could,yes,skip,personal use: one owner
-Traffic routing by device or country,redirect,could,yes,no,
+Traffic routing by device or country,redirect,could,yes,partial,country block/allow per link (owner request); device routing not yet
 Buy a domain inside the app,domains,could,yes,skip,needs a registrar partnership
 Their rebrand.ly service domain,domains,could,yes,skip,owned by them; use your own
 Third-party integrations marketplace,integrations,could,yes,skip,their partner apps

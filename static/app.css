@@ -161,3 +161,11 @@ body.auth { display: grid; place-items: center; min-height: 100vh; padding: var(
   .actions-cell { width: 100%; }
   .dest { max-width: none; }
 }
+
+/* countries per link */
+.geo-modes { border: 0; padding: 0; margin: 0 0 var(--space-3); display: grid; gap: var(--space-2); }
+.geo-picker[hidden] { display: none; }
+.geo-picker input[type=search] { margin-bottom: var(--space-1); }
+.geo-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--space-1) var(--space-3); }
+.geo-item[hidden] { display: none; }
+.geo-emoji { font-size: 40px; margin: 0 0 var(--space-2); }

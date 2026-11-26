@@ -313,6 +313,62 @@ class E2E(unittest.TestCase):
         expect(sistema).to_contain_text("iPhone (iOS)")
         expect(sistema).to_contain_text("Mac")
 
+    def geo_hit(self, slug, cc):
+        r = self.page.request.get(self.base + "/" + slug, max_redirects=0,
+                                  headers={"User-Agent": HUMAN_UA, **({"CF-IPCountry": cc} if cc else {})})
+        return r.status, r.text() if r.status != 302 else ""
+
+    def set_geo(self, slug, mode_label, countries):
+        p = self.page
+        p.goto(self.base + "/links?q=" + slug)
+        p.get_by_role("link", name=f"Editar {slug}").click()
+        p.locator("details.geo summary").click()
+        p.get_by_label(mode_label).check()
+        for name in countries:
+            p.get_by_placeholder("Procurar país…").fill(name)
+            p.get_by_role("checkbox", name=name, exact=True).check()
+        p.get_by_role("button", name="Salvar").click()
+        expect(p.get_by_text("Alterações salvas.")).to_be_visible()
+
+    def test_f06_block_countries(self):
+        self.create("https://exemplo.com/geo1", "geobloq")
+        self.set_geo("geobloq", "Bloquear os países marcados", ["Brasil", "Estados Unidos"])
+        expect(self.page.locator("tbody")).to_contain_text("Bloqueado em Brasil, Estados Unidos")
+        status, body = self.geo_hit("geobloq", "BR")
+        self.assertEqual(status, 403)
+        self.assertIn("Oi, curioso! Aqui não.", body)
+        self.assertEqual(self.geo_hit("geobloq", "PT")[0], 302)
+        self.assertEqual(self.geo_hit("geobloq", None)[0], 302)  # unknown country passes
+        self.assertEqual(self.clicks_for("geobloq"), 2)  # the blocked visit is not counted
+        self.page.get_by_role("link", name="Ver estatísticas de geobloq").click()
+        expect(self.page.get_by_text("1 acesso de país bloqueado foi barrado")).to_be_visible()
+
+    def test_f06_allow_only(self):
+        self.create("https://exemplo.com/geo2", "geolib")
+        self.set_geo("geolib", "Funcionar só nos países marcados", ["Portugal"])
+        self.assertEqual(self.geo_hit("geolib", "PT")[0], 302)
+        self.assertEqual(self.geo_hit("geolib", "BR")[0], 403)
+        self.assertEqual(self.geo_hit("geolib", None)[0], 403)  # unknown country is not on the list
+        # back to everywhere
+        p = self.page
+        p.goto(self.base + "/links?q=geolib")
+        p.get_by_role("link", name="Editar geolib").click()
+        # the section is already open when a rule is active
+        expect(p.locator("details.geo")).to_have_attribute("open", "")
+        p.get_by_label("Funciona em todos os países").check()
+        p.get_by_role("button", name="Salvar").click()
+        self.assertEqual(self.geo_hit("geolib", "BR")[0], 302)
+
+    def test_f06_needs_a_country(self):
+        self.create("https://exemplo.com/geo3", "geovazio")
+        p = self.page
+        p.goto(self.base + "/links?q=geovazio")
+        p.get_by_role("link", name="Editar geovazio").click()
+        p.locator("details.geo summary").click()
+        p.get_by_label("Bloquear os países marcados").check()
+        p.get_by_role("button", name="Salvar").click()
+        expect(p.locator("#geo-err")).to_have_text("Marque pelo menos um país para bloquear.")
+
     # F08 search
     def test_f08_search(self):
         self.create("https://exemplo.com/a", "busca-alpha", "Alpha")

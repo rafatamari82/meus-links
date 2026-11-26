@@ -80,3 +80,21 @@ test("country names in Portuguese", () => {
   assert.equal(core.countryName("XX"), "Desconhecido");
   assert.equal(core.countryName(""), "Desconhecido");
 });
+test("geo rules", () => {
+  assert.ok(core.geoAllows("off", "", "BR"));
+  assert.ok(!core.geoAllows("block", "BR,US", "BR"));
+  assert.ok(core.geoAllows("block", "BR,US", "PT"));
+  assert.ok(core.geoAllows("block", "BR", null), "unknown country passes a block list");
+  assert.ok(core.geoAllows("allow", "PT", "PT"));
+  assert.ok(!core.geoAllows("allow", "PT", "BR"));
+  assert.ok(!core.geoAllows("allow", "PT", null), "unknown country does not pass an allow list");
+  assert.ok(!core.geoAllows("allow", "PT", "XX"));
+});
+test("clean geo", () => {
+  assert.deepEqual(core.cleanGeo("block", ["us", "br", "BR", "ZZ"]), { mode: "block", countries: "BR,US" });
+  assert.deepEqual(core.cleanGeo("off", ["BR"]), { mode: "off", countries: "" });
+  assert.deepEqual(core.cleanGeo("hack", ["BR"]), { mode: "off", countries: "" });
+  assert.throws(() => core.cleanGeo("allow", []), core.ValidationError);
+  assert.equal(core.countryOptions()[0][1], "Brasil");
+  assert.equal(core.countryOptions().length, core.COUNTRY_CODES.length);
+});

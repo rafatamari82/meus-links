@@ -43,4 +43,7 @@ export const MIGRATIONS = [
   `alter table clicks add column country text`,
   `alter table clicks add column device text`,
   `alter table clicks add column os text`,
+  `alter table clicks add column blocked integer not null default 0`,
+  `alter table links add column geo_mode text not null default 'off'`,
+  `alter table links add column geo_countries text not null default ''`,
 ];
