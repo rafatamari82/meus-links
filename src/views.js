@@ -25,7 +25,7 @@ const dateTimeFmt = new Intl.DateTimeFormat("pt-BR", {
 export const fmtDate = (iso) => (iso ? dateFmt.format(new Date(iso)) : "—");
 export const fmtDateTime = (iso) => (iso ? dateTimeFmt.format(new Date(iso)).replace(",", "") : "—");
 
-const ICON = raw('<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9.5 14.5l5-5M8 11l-2 2a3.5 3.5 0 005 5l2-2M16 13l2-2a3.5 3.5 0 00-5-5l-2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
+const ICON = raw('<img class="brand-logo" src="/static/logo-64.png" alt="" width="28" height="28">');
 export const csrfField = (c) => html`<input type="hidden" name="csrf" value="${c.csrf}">`;
 
 function head(title, assetVersion) {
@@ -37,14 +37,14 @@ function head(title, assetVersion) {
   <meta name="robots" content="noindex">
   <title>${title} · Cutti</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=${assetVersion}">
-  <meta name="theme-color" content="#16394c">
-  <link rel="apple-touch-icon" href="/static/apple-touch-icon-16394c.png">
+  <meta name="theme-color" content="#02235b">
+  <link rel="apple-touch-icon" href="/static/logo-apple-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Cutti">
   <link rel="stylesheet" href="/static/tokens.css?v=${assetVersion}">
   <link rel="stylesheet" href="/static/app.css?v=${assetVersion}">
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/logo-64.png" type="image/png">
   <script src="/static/app.js?v=${assetVersion}" defer></script>
 </head>`;
 }

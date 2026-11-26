@@ -5,7 +5,7 @@ self.addEventListener("push", function (e) {
   var d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: "Cutti", body: e.data ? e.data.text() : "" }; }
   e.waitUntil(self.registration.showNotification(d.title || "Cutti", {
-    body: d.body || "", icon: "/static/icon-192-16394c.png", badge: "/static/icon-192-16394c.png",
+    body: d.body || "", icon: "/static/logo-192.png", badge: "/static/logo-192.png",
     tag: d.tag || undefined, data: { url: d.url || "/sales" },
   }));
 });
