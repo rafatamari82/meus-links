@@ -273,7 +273,7 @@ class E2E(unittest.TestCase):
         p.get_by_label("Domínio", exact=True).fill("go.errado.com")
         p.get_by_role("button", name="Adicionar").click()
         p.get_by_role("button", name="Verificar").click()
-        expect(p.locator(".toast-error")).to_contain_text("Ainda não chega neste app")
+        expect(p.locator(".toast-error")).to_contain_text("Não consegui confirmar daqui")
 
     def test_f04_token_only_for_known_domains(self):
         self.assertEqual(self.raw_get("desconhecido.com", "/.well-known/shortlinks-verify")[0], 404)

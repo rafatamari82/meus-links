@@ -523,7 +523,8 @@ async function verifyDomain(c, id) {
       .bind(ts, ts, id).run();
     c.flash("success", `${d.full_name} verificado e ativo.`);
   } else {
-    const msg = `Ainda não chega neste app (${reason}). Confira se o domínio foi adicionado em Custom domain na Cloudflare. O certificado pode levar alguns minutos.`;
+    // A Worker on *.workers.dev can get a 52x when it calls its own custom domain; a real visit settles it.
+    const msg = `Não consegui confirmar daqui (${reason}). Abra https://${d.full_name} uma vez no navegador e recarregue esta página: a primeira visita ativa o domínio. Se não abrir, confira se ele está em Custom domain na Cloudflare.`;
     await c.db.prepare("update domains set last_check_error = ?, updated_at = ? where id = ?").bind(msg, ts, id).run();
     c.flash("error", msg);
   }
