@@ -46,4 +46,8 @@ export const MIGRATIONS = [
   `alter table clicks add column blocked integer not null default 0`,
   `alter table links add column geo_mode text not null default 'off'`,
   `alter table links add column geo_countries text not null default ''`,
+  `alter table links add column kind text not null default 'redirect'`,
+  `alter table links add column template text`,
+  `alter table links add column page_data text`,
+  `alter table links add column cta_clicks integer not null default 0`,
 ];
