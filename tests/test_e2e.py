@@ -561,28 +561,6 @@ class E2E(unittest.TestCase):
         expect(row.locator("td[data-label=Vendas]")).to_have_text("1")
         expect(row).to_contain_text("YouTube")
 
-    def test_s01_spy_google_daily_check(self):
-        p = self.page
-        p.goto(self.base + "/spy")
-        expect(p.get_by_role("heading", name="Monte sua lista do dia")).to_be_visible()
-        p.get_by_label("Palavras (uma por linha)").fill("sodapeak review\nhoneyboost reviews")
-        p.get_by_label("País do Google").select_option(label="Estados Unidos")
-        p.get_by_role("button", name="Adicionar").first.click()
-        expect(p.get_by_text("2 palavra(s) adicionada(s)")).to_be_visible()
-        row = p.locator("tr", has_text="sodapeak review")
-        href = row.get_by_role("link", name="Google").get_attribute("href")
-        self.assertIn("google.com/search?q=sodapeak+review&gl=us&hl=en", href)
-        self.assertIn("tbm=vid", row.get_by_role("link", name="Vídeos").get_attribute("href"))
-        row.get_by_role("button", name="Rankeando").click()
-        row = p.locator("tr", has_text="sodapeak review")
-        expect(row.get_by_role("button", name="Rankeando")).to_have_attribute("aria-pressed", "true")
-        expect(p.get_by_text("hoje 1 de 2 conferidas, rankeando em 1")).to_be_visible()
-        expect(row.locator(".dot-yes")).to_have_count(1)
-        p.get_by_label("Site do concorrente").fill("https://concorrente.com/oferta")
-        p.get_by_role("button", name="Adicionar").last.click()
-        link = p.get_by_role("link", name="Ver anúncios")
-        self.assertIn("region=US&domain=concorrente.com", link.get_attribute("href"))
-
     def test_s02_simple_country_search(self):
         p = self.page
         p.goto(self.base + "/spy")
@@ -597,8 +575,11 @@ class E2E(unittest.TestCase):
         loc = r.headers["x-search-target"]
         self.assertTrue(loc.startswith("https://www.google.co.uk/search?q=sodapeak+review&gl=gb&hl=en"), loc)
         self.assertIn("tbm=vid", loc)
-        bing = p.request.get(self.base + "/spy/go?q=x&engine=bing&country=US&lang=en").headers["x-search-target"]
-        self.assertIn("bing.com/search?q=x&cc=us", bing)
+        expect(p.get_by_text("Bing")).to_have_count(0)
+        expect(p.get_by_text("Minhas palavras do dia")).to_have_count(0)
+        p.get_by_label("Site do concorrente").fill("https://concorrente.com/oferta")
+        p.get_by_role("button", name="Adicionar").click()
+        self.assertIn("region=US&domain=concorrente.com", p.get_by_role("link", name="Ver anúncios").get_attribute("href"))
 
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
