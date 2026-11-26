@@ -1,6 +1,6 @@
 // Tracker screens: Resultados, Vendas, Integrações.
 import { csrfField, fieldError, fmtDateTime, html, page, raw } from "./views.js";
-import { fmtMoney, googleAdsScript, NETWORKS, SOURCES } from "./tracker.js";
+import { fmtMoney, googleAdsScript, NETWORKS, renderTemplate, SAMPLE_VARS, SOURCES, TEMPLATE_VARS } from "./tracker.js";
 
 const SOURCE_LABEL = { ...SOURCES, none: "Sem rastreio" };
 const TYPE_LABEL = { sale: "Venda", upsell: "Upsell", refund: "Reembolso", chargeback: "Chargeback" };
@@ -343,6 +343,7 @@ function notifySection(c, s, tgError, devices) {
       </form>`}
     </div>
   </div>
+  ${templateEditor(c, s)}
   <div class="row notify-foot">
     <form method="post" action="/integrations/notify-prefs" class="row">
       ${csrfField(c)}
@@ -351,4 +352,43 @@ function notifySection(c, s, tgError, devices) {
     ${any ? html`<form method="post" action="/integrations/notify-test">${csrfField(c)}<button class="btn btn-secondary" type="submit">Testar aviso</button></form>` : ""}
   </div>
 </section>`;
+}
+
+function templateEditor(c, s) {
+  const t = s.templates;
+  const field = (k, label) => html`<div class="field"><label for="tpl-${k}">${label}</label>
+    <input id="tpl-${k}" name="${k}" maxlength="200" value="${t[k]}" data-tpl="${k}" spellcheck="false"></div>`;
+  const preview = (kind) => html`<div class="push-preview" data-preview="${kind}">
+    <img src="/static/icon-192.png" alt="" width="36" height="36">
+    <div><strong data-preview-title>${renderTemplate(t[`${kind}_title`], kind === "sale" ? SAMPLE_VARS : { ...SAMPLE_VARS, emoji: "↩️", tipo: "Reembolso" })}</strong>
+    <span data-preview-body>${renderTemplate(t[`${kind}_body`], kind === "sale" ? SAMPLE_VARS : { ...SAMPLE_VARS, emoji: "↩️", tipo: "Reembolso" })}</span></div>
+  </div>`;
+  return html`
+<details class="utm tpl-editor">
+  <summary>Personalizar o texto do aviso</summary>
+  <form method="post" action="/integrations/templates" class="stack" novalidate>
+    ${csrfField(c)}
+    <script type="application/json" id="tpl-sample">${raw(JSON.stringify(SAMPLE_VARS).replace(/</g, "\\u003c"))}</script>
+    <div class="tpl-grid">
+      <div class="stack">
+        <h3 class="h-md">Venda e upsell</h3>
+        ${field("sale_title", "Título")}${field("sale_body", "Texto")}
+        ${preview("sale")}
+      </div>
+      <div class="stack">
+        <h3 class="h-md">Reembolso e chargeback</h3>
+        ${field("refund_title", "Título")}${field("refund_body", "Texto")}
+        ${preview("refund")}
+      </div>
+    </div>
+    <div>
+      <p class="hint">Escreva o que quiser, com emojis. Clique numa variável para inserir no último campo que você tocou. Variável vazia some sozinha, junto com o “·”.</p>
+      <div class="chips">${Object.entries(TEMPLATE_VARS).map(([k, d]) => html`<button type="button" class="chip" data-var="{${k}}" title="${d}">{${k}}</button>`)}</div>
+    </div>
+    <div class="row-end">
+      <button class="btn btn-ghost" type="submit" name="reset" value="1">Voltar ao padrão</button>
+      <button class="btn btn-primary" type="submit">Salvar texto</button>
+    </div>
+  </form>
+</details>`;
 }

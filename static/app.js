@@ -135,6 +135,42 @@
   }
   document.addEventListener("DOMContentLoaded", setupPush);
 
+  // Notification text editor: live preview and variable chips.
+  var lastTpl = null;
+  function renderTpl(tpl, vars) {
+    var out = tpl.replace(/\{(\w+)\}/g, function (m, k) { return k in vars ? String(vars[k]) : m; });
+    return out.split(/\s*·\s*/).map(function (x) { return x.trim(); })
+      .filter(function (x) { return x && !/^(pedido|clique)$/i.test(x); }).join(" · ").replace(/\s{2,}/g, " ").trim();
+  }
+  function refreshPreview(form) {
+    var el = document.getElementById("tpl-sample");
+    if (!el) return;
+    var sample = JSON.parse(el.textContent);
+    ["sale", "refund"].forEach(function (kind) {
+      var vars = Object.assign({}, sample, kind === "refund" ? { emoji: "↩️", tipo: "Reembolso" } : {});
+      var box = form.querySelector('[data-preview="' + kind + '"]');
+      box.querySelector("[data-preview-title]").textContent = renderTpl(form.elements[kind + "_title"].value, vars) || "Cutti";
+      box.querySelector("[data-preview-body]").textContent = renderTpl(form.elements[kind + "_body"].value, vars);
+    });
+  }
+  document.addEventListener("input", function (e) {
+    if (e.target.matches("[data-tpl]")) { lastTpl = e.target; refreshPreview(e.target.form); }
+  });
+  document.addEventListener("focusin", function (e) { if (e.target.matches("[data-tpl]")) lastTpl = e.target; });
+  document.addEventListener("click", function (e) {
+    var chip = e.target.closest("[data-var]");
+    if (!chip) return;
+    var form = chip.closest("form");
+    var inp = lastTpl && lastTpl.form === form ? lastTpl : form.querySelector("[data-tpl]");
+    var v = chip.getAttribute("data-var");
+    var at = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+    inp.value = inp.value.slice(0, at) + v + inp.value.slice(inp.selectionEnd == null ? at : inp.selectionEnd);
+    inp.focus();
+    inp.setSelectionRange(at + v.length, at + v.length);
+    lastTpl = inp;
+    refreshPreview(form);
+  });
+
   document.addEventListener("DOMContentLoaded", function () {
     var d = document.querySelector("dialog[data-open-on-load]");
     if (d && d.showModal) {

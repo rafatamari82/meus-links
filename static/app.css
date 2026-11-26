@@ -218,3 +218,12 @@ input[type=date] { height: 40px; padding: 0 var(--space-2); font: inherit; color
 .h-md { font-size: var(--text-base); line-height: var(--leading-base); font-weight: 600; margin: 0; }
 .notify-foot { justify-content: space-between; margin-top: var(--space-4); }
 .notify-main { border-color: var(--color-accent); }
+.tpl-editor { margin-top: var(--space-4); }
+.tpl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-5); }
+.push-preview { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3); border-radius: 14px; background: var(--color-surface); border: 1px solid var(--color-border); }
+.push-preview img { border-radius: 8px; flex: none; }
+.push-preview strong { display: block; }
+.push-preview span { color: var(--color-text-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
+.chip { font: inherit; font-family: var(--font-mono); font-size: var(--text-xs); padding: 2px var(--space-2); border-radius: var(--radius-pill); border: 1px solid var(--color-border-input); background: var(--color-bg); color: var(--color-text); cursor: pointer; }
+.chip:hover { background: var(--color-accent-soft); }

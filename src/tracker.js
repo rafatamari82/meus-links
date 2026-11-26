@@ -321,3 +321,43 @@ export const PRESELL_JS = `(function(){
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",all); else all();
   document.addEventListener("click",function(e){ var a=e.target.closest&&e.target.closest("a"); if(a) tag(a); },true);
 })();`;
+
+// ---------------------------------------------------------------- notification text
+
+export const TEMPLATE_DEFAULTS = {
+  sale_title: "{emoji} {tipo}! {valor}",
+  sale_body: "{rede} · {origem} · {campanha} · {anuncio}",
+  refund_title: "{emoji} {tipo} {valor}",
+  refund_body: "{rede} · {campanha} · pedido {pedido}",
+};
+
+export const TEMPLATE_VARS = {
+  emoji: "💰 nas vendas, ↩️ no reembolso, ⚠️ no chargeback",
+  tipo: "Venda, Upsell, Reembolso ou Chargeback",
+  valor: "valor na moeda da rede (US$ 87,50)",
+  valor_painel: "valor convertido para a moeda do painel (R$ 472,50)",
+  rede: "ClickBank, BuyGoods…",
+  origem: "Google Ads ou NewsBreak",
+  campanha: "nome da campanha",
+  anuncio: "anúncio",
+  palavra: "palavra-chave do Google",
+  pedido: "número do pedido",
+  hoje: "vendas de hoje até agora (contando esta)",
+  total_hoje: "faturamento de hoje no painel",
+};
+
+export const SAMPLE_VARS = {
+  emoji: "💰", tipo: "Venda", valor: "US$ 87,50", valor_painel: "R$ 472,50", rede: "ClickBank", origem: "Google Ads",
+  campanha: "Campanha exemplo", anuncio: "Anúncio 3", palavra: "receita de bolo", pedido: "ABC123", hoje: "4", total_hoje: "R$ 1.890,00",
+};
+
+export function cleanTemplate(raw, fallback) {
+  const t = String(raw ?? "").replace(/[\r\n]+/g, " ").trim().slice(0, 200);
+  return t || fallback;
+}
+
+/** Fill {variables}; empty ones drop out together with their " · " separator. */
+export function renderTemplate(tpl, vars) {
+  const out = String(tpl).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k] ?? "") : m));
+  return out.split(/\s*·\s*/).map((x) => x.trim()).filter((x) => x && !/^(pedido|clique)$/i.test(x)).join(" · ").replace(/\s{2,}/g, " ").trim();
+}

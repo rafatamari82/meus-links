@@ -519,6 +519,22 @@ class E2E(unittest.TestCase):
         expect(p.get_by_text("Aparelho removido")).to_be_visible()
         expect(p.locator(".notify-main")).not_to_contain_text("ativado em")
 
+    def test_t06_custom_notification_text(self):
+        p = self.page
+        p.goto(self.base + "/integrations")
+        p.locator("summary", has_text="Personalizar o texto do aviso").click()
+        title = p.locator("#tpl-sale_title")
+        title.fill("🤑 Caiu ")
+        p.get_by_role("button", name="{valor_painel}").click()
+        expect(title).to_have_value("🤑 Caiu {valor_painel}")
+        expect(p.locator('[data-preview="sale"] [data-preview-title]')).to_have_text("🤑 Caiu R$ 472,50")
+        p.get_by_role("button", name="Salvar texto").click()
+        expect(p.get_by_text("Texto do aviso salvo")).to_be_visible()
+        expect(p.locator("#tpl-sale_title")).to_have_value("🤑 Caiu {valor_painel}")
+        p.locator("summary", has_text="Personalizar o texto do aviso").click()
+        p.get_by_role("button", name="Voltar ao padrão").click()
+        expect(p.locator("#tpl-sale_title")).to_have_value("{emoji} {tipo}! {valor}")
+
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
                                      storage_state=self.ctx.storage_state()).new_page()

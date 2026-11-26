@@ -36,6 +36,7 @@ export async function getSettings(db) {
     tg_chat: s.tg_chat || "",
     tg_name: s.tg_name || "",
     notify_refunds: s.notify_refunds !== "0",
+    templates: Object.fromEntries(Object.entries(T.TEMPLATE_DEFAULTS).map(([k, d]) => [k, s[`tpl_${k}`] || d])),
   };
 }
 
@@ -119,7 +120,7 @@ export async function postback(c, key, network) {
 
   // Phone notification.
   if (!dup && (p.type === "sale" || p.type === "upsell" || s.notify_refunds)) {
-    c.exec.waitUntil(saleMessage(c.db, network, p, click).then((m) => notify(c.db, s, m, c.env.__notifyFetch || fetch)).catch((e) => console.error("notify", e)));
+    c.exec.waitUntil(saleMessage(c.db, s, network, p, click).then((m) => notify(c.db, s, m, c.env.__notifyFetch || fetch)).catch((e) => console.error("notify", e)));
   }
 
   // Tell NewsBreak about the sale, so its algorithm learns from it.
@@ -133,20 +134,43 @@ export async function postback(c, key, network) {
 
 // ---------------------------------------------------------------- phone notifications
 
-async function saleMessage(db, network, p, click) {
-  const head = { sale: "💰 Venda!", upsell: "💰 Upsell!", refund: "↩️ Reembolso", chargeback: "⚠️ Chargeback" }[p.type];
-  const value = T.fmtMoney(p.amount_cents || 0, p.currency || "USD");
-  let where = "sem clique rastreado";
-  if (click) {
-    let name = click.campaign || "";
-    if (name) {
-      const r = await db.prepare("select campaign_name from tk_costs where source = ? and campaign_key = ? and campaign_name is not null limit 1")
-        .bind(click.source, name).first();
-      if (r?.campaign_name) name = r.campaign_name;
-    }
-    where = [T.SOURCES[click.source] || click.source, name, click.ad].filter(Boolean).join(" · ");
+async function saleMessage(db, s, network, p, click) {
+  const refund = p.type === "refund" || p.type === "chargeback";
+  let campanha = click?.campaign || "";
+  if (campanha) {
+    const r = await db.prepare("select campaign_name from tk_costs where source = ? and campaign_key = ? and campaign_name is not null limit 1")
+      .bind(click.source, campanha).first();
+    if (r?.campaign_name) campanha = r.campaign_name;
   }
-  return { title: `${head} ${value}`, body: `${T.NETWORKS[network]?.name || network} · ${where}`, refund: p.type === "refund" || p.type === "chargeback" };
+  const today = utcStart(spToday());
+  const rows = (await db.prepare("select type, currency, sum(amount_cents) as cents, count(*) as n from tk_conversions where at >= ? group by type, currency")
+    .bind(today).all()).results;
+  let hoje = 0;
+  let total = 0;
+  for (const r of rows) {
+    if (r.type === "sale" || r.type === "upsell") hoje += r.n;
+    total += sumRev(r.type, T.convert(r.cents, r.currency, s.currency, s));
+  }
+  const vars = {
+    emoji: { sale: "💰", upsell: "💰", refund: "↩️", chargeback: "⚠️" }[p.type],
+    tipo: { sale: "Venda", upsell: "Upsell", refund: "Reembolso", chargeback: "Chargeback" }[p.type],
+    valor: T.fmtMoney(p.amount_cents || 0, p.currency || "USD"),
+    valor_painel: T.fmtMoney(T.convert(p.amount_cents || 0, p.currency || "USD", s.currency, s), s.currency),
+    rede: T.NETWORKS[network]?.name || network,
+    origem: click ? (T.SOURCES[click.source] || click.source) : "sem clique rastreado",
+    campanha, anuncio: click?.ad || "", palavra: click?.keyword || "", pedido: p.txid || "",
+    hoje: String(hoje), total_hoje: T.fmtMoney(total, s.currency),
+  };
+  return messageFrom(s, vars, refund);
+}
+
+function messageFrom(s, vars, refund) {
+  const t = s.templates;
+  return {
+    title: T.renderTemplate(refund ? t.refund_title : t.sale_title, vars) || "Cutti",
+    body: T.renderTemplate(refund ? t.refund_body : t.sale_body, vars),
+    refund,
+  };
 }
 
 /** Send to every channel that is set up. Returns a list of errors (empty when all went out). */
@@ -431,10 +455,22 @@ export async function integrationsPost(c, action) {
     }
   } else if (action === "notify-test") {
     const s = await getSettings(c.db);
-    const r = await notify(c.db, s, { title: "💰 Venda! US$ 87,50", body: "Teste do cutti.us · Google Ads · Campanha exemplo" }, c.env.__notifyFetch || fetch);
+    const r = await notify(c.db, s, messageFrom(s, T.SAMPLE_VARS, false), c.env.__notifyFetch || fetch);
     if (!r.sent) c.flash("error", "Nenhum aviso configurado ainda.");
     else if (r.errors.length) c.flash("error", `Não foi: ${r.errors.join("; ")}`);
     else c.flash("success", "Aviso de teste enviado. Olhe o celular.");
+  } else if (action === "templates") {
+    if (f.get("reset")) {
+      for (const k of Object.keys(T.TEMPLATE_DEFAULTS)) await setSetting(c.db, `tpl_${k}`, "");
+      c.flash("success", "Texto do aviso voltou ao padrão.");
+    } else {
+      for (const [k, d] of Object.entries(T.TEMPLATE_DEFAULTS)) {
+        const v = T.cleanTemplate(f.get(k), d);
+        await setSetting(c.db, `tpl_${k}`, v === d ? "" : v);
+      }
+      c.flash("success", "Texto do aviso salvo. Toque em Testar aviso para ver no celular.");
+    }
+    return c.redirect("/integrations#avisos");
   } else if (action === "notify-prefs") {
     await setSetting(c.db, "notify_refunds", f.get("refunds") ? "1" : "0");
     c.flash("success", "Preferência salva.");

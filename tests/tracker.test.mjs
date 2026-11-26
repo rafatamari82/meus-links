@@ -71,3 +71,12 @@ test("cost CSV", () => {
   assert.deepEqual([r.rows[0].date, r.rows[0].campaign_key, r.rows[0].cost_cents, r.rows[0].clicks], ["2026-11-24", "Oferta, US", 3520, 40]);
   assert.ok(T.parseCostCsv("a,b\n1,2").error);
 });
+
+test("notification templates", () => {
+  const v = { emoji: "💰", tipo: "Venda", valor: "US$ 10,00", rede: "ClickBank", origem: "Google Ads", campanha: "", anuncio: "A1", pedido: "" };
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_title, v), "💰 Venda! US$ 10,00");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_body, v), "ClickBank · Google Ads · A1");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.refund_body, v), "ClickBank");
+  assert.equal(T.renderTemplate("Caiu {valor} {desconhecida}", v), "Caiu US$ 10,00 {desconhecida}");
+  assert.equal(T.cleanTemplate("  ", "x"), "x");
+});
