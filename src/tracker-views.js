@@ -1,0 +1,281 @@
+// Tracker screens: Resultados, Vendas, Integrações.
+import { csrfField, fieldError, fmtDateTime, html, page, raw } from "./views.js";
+import { fmtMoney, googleAdsScript, NETWORKS, SOURCES } from "./tracker.js";
+
+const SOURCE_LABEL = { ...SOURCES, none: "Sem rastreio" };
+const TYPE_LABEL = { sale: "Venda", upsell: "Upsell", refund: "Reembolso", chargeback: "Chargeback" };
+const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(1).replace(".", ",")}%` : "—");
+const ratio = (x) => (x == null ? "—" : `${x.toFixed(2).replace(".", ",")}x`);
+const ddmm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+
+function rangeForm(range, extra = {}) {
+  const opt = (v, l) => html`<option value="${v}" ${range.preset === v ? raw("selected") : ""}>${l}</option>`;
+  return html`
+<form class="filters" method="get" data-range>
+  ${Object.entries(extra).map(([k, v]) => (v ? html`<input type="hidden" name="${k}" value="${v}">` : ""))}
+  <label class="sr-only" for="p">Período</label>
+  <select id="p" name="p" data-range-preset>
+    ${opt("today", "Hoje")}${opt("yesterday", "Ontem")}${opt("7d", "Últimos 7 dias")}${opt("30d", "Últimos 30 dias")}${opt("month", "Este mês")}${opt("custom", "Escolher datas")}
+  </select>
+  <span class="range-custom" ${range.preset === "custom" ? "" : raw("hidden")}>
+    <label class="sr-only" for="from">De</label><input id="from" name="from" type="date" value="${range.from}">
+    <label class="sr-only" for="to">Até</label><input id="to" name="to" type="date" value="${range.to}">
+  </span>
+  <button class="btn btn-secondary" type="submit">Ver</button>
+</form>`;
+}
+
+function stat(label, value, tone = "") {
+  return html`<div class="card pad stat"><p class="stat-label">${label}</p><p class="stat-value ${tone}">${value}</p></div>`;
+}
+
+function chart(series, cur) {
+  if (!series.some((x) => x.rev || x.cost)) return html`<p class="muted">Sem vendas nem gasto no período.</p>`;
+  const max = Math.max(1, ...series.map((x) => Math.max(Math.abs(x.rev), x.cost)));
+  const w = 300 / series.length;
+  const bw = Math.max(1, w / 2 - 1);
+  const bars = series.map((x, i) => {
+    const hr = (Math.max(0, x.rev) / max) * 110;
+    const hc = (x.cost / max) * 110;
+    return html`<rect x="${(i * w + 0.5).toFixed(2)}" y="${(115 - hr).toFixed(1)}" width="${bw.toFixed(2)}" height="${Math.max(hr, 0.5).toFixed(1)}" class="bar"><title>${ddmm(x.d)} faturamento ${fmtMoney(x.rev, cur)}</title></rect>
+<rect x="${(i * w + 0.5 + bw + 0.5).toFixed(2)}" y="${(115 - hc).toFixed(1)}" width="${bw.toFixed(2)}" height="${Math.max(hc, 0.5).toFixed(1)}" class="bar-cost"><title>${ddmm(x.d)} gasto ${fmtMoney(x.cost, cur)}</title></rect>`;
+  });
+  return html`
+<div class="legend"><span><i class="sw sw-rev"></i>Faturamento</span><span><i class="sw sw-cost"></i>Gasto</span></div>
+<svg class="bars" viewBox="0 0 300 120" preserveAspectRatio="none" role="img" aria-label="Faturamento e gasto por dia">${bars}</svg>
+<div class="bars-axis"><span>${ddmm(series[0].d)}</span><span>${ddmm(series[series.length - 1].d)}</span></div>
+<table class="sr-only"><caption>Faturamento e gasto por dia</caption><thead><tr><th>Dia</th><th>Faturamento</th><th>Gasto</th></tr></thead>
+<tbody>${series.map((x) => html`<tr><th scope="row">${ddmm(x.d)}</th><td>${fmtMoney(x.rev, cur)}</td><td>${fmtMoney(x.cost, cur)}</td></tr>`)}</tbody></table>`;
+}
+
+export function resultsView(c, { s, range, byAd, srcFilter, list, tot, series, hasAny }) {
+  const cur = s.currency;
+  const m = (x) => (x == null ? "—" : fmtMoney(x, cur));
+  const tab = (label, params, on) => html`<a class="tab ${on ? "is-current" : ""}" href="/results?${new URLSearchParams(params)}" ${on ? raw('aria-current="page"') : ""}>${label}</a>`;
+  const base = { p: range.preset, ...(range.preset === "custom" ? { from: range.from, to: range.to } : {}) };
+  const withBy = byAd ? { by: "ad" } : {};
+  const withSrc = srcFilter ? { source: srcFilter } : {};
+  const empty = !hasAny ? html`
+<div class="empty card">
+  <h2 class="h-lg">Comece a rastrear</h2>
+  <p class="muted">1. Em um link, abra “Rastrear vendas” e escolha a rede. 2. Cole a URL de postback na rede (aba Integrações). 3. Use o link no anúncio com o modelo de rastreamento do Google Ads ou da NewsBreak.</p>
+  <a class="btn btn-primary" href="/integrations">Abrir Integrações</a>
+</div>` : "";
+  return page({ ...c, section: "results" }, "Resultados", html`
+<header class="page-head">
+  <div><h1 class="h-xl">Resultados</h1><p class="muted">${ddmm(range.from)} a ${ddmm(range.to)} · valores em ${cur}</p></div>
+  ${rangeForm(range, { ...withBy, ...withSrc })}
+</header>
+${empty}
+<div class="stats-grid">
+  ${stat("Faturamento", m(tot.revenue))}
+  ${stat("Gasto", m(tot.cost))}
+  ${stat("Lucro", m(tot.profit), tot.profit < 0 ? "neg" : tot.profit > 0 ? "pos" : "")}
+  ${stat("ROAS", ratio(tot.roas))}
+</div>
+<div class="stats-grid">
+  ${stat("Vendas", tot.sales)}
+  ${stat("CPA", m(tot.cpa))}
+  ${stat("Cliques", tot.clicks)}
+  ${stat("Conversão", pct(tot.trackedSales, tot.clicks))}
+</div>
+<section class="card pad">
+  <h2 class="h-lg">Por dia</h2>
+  ${chart(series, cur)}
+</section>
+<section class="card table-wrap">
+  <div class="table-head">
+    <nav class="tabs" aria-label="Agrupar por">
+      ${tab("Campanhas", { ...base, ...withSrc }, !byAd)}${tab("Anúncios", { ...base, ...withSrc, by: "ad" }, byAd)}
+    </nav>
+    <nav class="tabs" aria-label="Origem">
+      ${tab("Todas", { ...base, ...withBy }, !srcFilter)}${tab("Google Ads", { ...base, ...withBy, source: "google" }, srcFilter === "google")}${tab("NewsBreak", { ...base, ...withBy, source: "newsbreak" }, srcFilter === "newsbreak")}
+    </nav>
+  </div>
+  ${list.length ? html`
+  <table class="links-table results-table">
+    <thead><tr><th scope="col">${byAd ? "Anúncio" : "Campanha"}</th><th scope="col" class="num">Cliques</th><th scope="col" class="num">Vendas</th>
+      <th scope="col" class="num">Conv.</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">Gasto</th>
+      <th scope="col" class="num">Lucro</th><th scope="col" class="num">ROAS</th><th scope="col" class="num">CPA</th></tr></thead>
+    <tbody>${list.map((r) => html`
+      <tr>
+        <td data-label="${byAd ? "Anúncio" : "Campanha"}"><div class="link-title">${(byAd ? r.ad : r.name) || (r.source === "none" ? "Vendas sem clique rastreado" : "(sem nome)")}</div>
+          <div class="hint">${SOURCE_LABEL[r.source] || r.source}${byAd && r.name ? ` · ${r.name}` : ""}${r.refunds ? ` · ${r.refunds} reembolso(s)` : ""}</div></td>
+        <td data-label="Cliques" class="num">${r.clicks}</td>
+        <td data-label="Vendas" class="num">${r.sales}</td>
+        <td data-label="Conv." class="num">${pct(r.sales, r.clicks)}</td>
+        <td data-label="Faturamento" class="num">${m(r.revenue)}</td>
+        <td data-label="Gasto" class="num">${m(r.cost)}</td>
+        <td data-label="Lucro" class="num ${r.profit < 0 ? "neg" : r.profit > 0 ? "pos" : ""}">${m(r.profit)}</td>
+        <td data-label="ROAS" class="num">${ratio(r.roas)}</td>
+        <td data-label="CPA" class="num">${m(r.cpa)}</td>
+      </tr>`)}</tbody>
+  </table>
+  ${byAd ? html`<p class="hint pad-x">O gasto vem por campanha, então na visão por anúncio aparecem só cliques e vendas.</p>` : ""}`
+    : html`<p class="muted pad">Nada neste período.</p>`}
+</section>`);
+}
+
+export function salesView(c, { s, range, sales, events }) {
+  return page({ ...c, section: "sales" }, "Vendas", html`
+<header class="page-head">
+  <div><h1 class="h-xl">Vendas</h1><p class="muted">${sales.length} registro(s) de ${ddmm(range.from)} a ${ddmm(range.to)}</p></div>
+  ${rangeForm(range)}
+</header>
+<section class="card table-wrap">
+  ${sales.length ? html`
+  <table class="links-table">
+    <thead><tr><th scope="col">Quando</th><th scope="col">Tipo</th><th scope="col">Rede</th><th scope="col">Origem</th><th scope="col" class="num">Valor</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>${sales.map((v) => html`
+      <tr>
+        <td data-label="Quando" class="nowrap">${fmtDateTime(v.at)}</td>
+        <td data-label="Tipo"><span class="badge ${v.type === "sale" || v.type === "upsell" ? "badge-success" : "badge-warning"}">${TYPE_LABEL[v.type]}</span></td>
+        <td data-label="Rede">${NETWORKS[v.network]?.name || v.network}<div class="hint">pedido ${v.txid}</div></td>
+        <td data-label="Origem">${v.click_id ? html`${SOURCE_LABEL[v.source] || v.source}<div class="hint">${[v.campaign, v.ad, v.keyword].filter(Boolean).join(" · ") || "sem campanha"}</div>` : html`<span class="muted">Sem clique rastreado</span>`}</td>
+        <td data-label="Valor" class="num">${v.type === "refund" || v.type === "chargeback" ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}</td>
+        <td class="actions-cell"><div class="actions"><form method="post" action="/sales/${v.id}/delete" data-confirm="Remover este registro? Ele sai dos resultados.">${csrfField(c)}<button class="btn btn-ghost btn-xs danger-text" type="submit">Remover</button></form></div></td>
+      </tr>`)}</tbody>
+  </table>` : html`<p class="muted pad">Nenhuma venda neste período.</p>`}
+</section>
+<section class="card pad">
+  <h2 class="h-lg">Últimos avisos recebidos</h2>
+  <p class="hint">Tudo o que as redes e o Google Ads mandaram, inclusive o que foi ignorado. Use para conferir se a integração está certa.</p>
+  ${events.length ? html`<table class="simple events"><tbody>${events.map((e) => html`
+    <tr><td class="nowrap">${fmtDateTime(e.at)}</td><td>${NETWORKS[e.network]?.name || e.network}</td>
+      <td><span class="badge ${e.outcome === "ok" ? "badge-success" : "badge-warning"}">${e.outcome}</span></td>
+      <td>${e.detail}${e.raw ? html`<details class="raw"><summary>ver dados</summary><pre>${e.raw}</pre></details>` : ""}</td></tr>`)}</tbody></table>`
+    : html`<p class="muted">Nada recebido ainda.</p>`}
+</section>`);
+}
+
+function copyBox(id, label, value, rows = 0) {
+  return html`<div class="field">
+  <label for="${id}">${label}</label>
+  <div class="copy-row">
+    ${rows ? html`<textarea id="${id}" rows="${rows}" readonly spellcheck="false">${value}</textarea>`
+    : html`<input id="${id}" value="${value}" readonly spellcheck="false">`}
+    <button class="btn btn-secondary btn-sm" type="button" data-copy="${value}">Copiar</button>
+  </div>
+</div>`;
+}
+
+export function integrationsView(c, { s, base, linkDomain, costCount, settingsError, csvError, csvValue, costError }) {
+  const pb = (net) => `${base}/pb/${s.key}/${net}`;
+  const last = (src) => costCount.find((x) => x.source === src);
+  const curOpt = (v, sel) => html`<option ${v === sel ? raw("selected") : ""}>${v}</option>`;
+  const gTemplate = `https://${linkDomain}/SEU-LINK?src=google&cmp={campaignid}&adg={adgroupid}&ad={creative}&kw={keyword}&gclid={gclid}&lp={lpurl}`;
+  const nbUrl = `https://${linkDomain}/SEU-LINK?src=newsbreak&cmp=__CAMPAIGN_NAME__&adg=__FLIGHT_NAME__&ad=__CREATIVE_NAME__&nbcb=__CALLBACK_PARAM__`;
+  return page({ ...c, section: "integrations" }, "Integrações", html`
+<header class="page-head"><div><h1 class="h-xl">Integrações</h1><p class="muted">Como o clique do anúncio chega até a venda.</p></div></header>
+
+<section class="card pad">
+  <h2 class="h-lg">Como funciona</h2>
+  <ol class="steps">
+    <li>Crie ou edite um link e abra <strong>Rastrear vendas</strong>. Escolha a rede: o link passa a gerar um código por clique (começa com <code>ct</code>) e manda esse código para a rede no parâmetro certo.</li>
+    <li>Cole a <strong>URL de postback</strong> da rede (logo abaixo) no painel da rede. Quando sai uma venda, a rede devolve o código e a comissão.</li>
+    <li>Use o link no anúncio com o modelo do Google Ads ou da NewsBreak, e mande o gasto para cá. Pronto: lucro por campanha em Resultados.</li>
+  </ol>
+  <p class="hint">Se você usa presell, cole este script na presell. Ele passa o código para os links da oferta: <code>&lt;script src="${base}/t.js" data-param="tid" defer&gt;&lt;/script&gt;</code>. Troque <code>tid</code> pelo parâmetro da rede, ou coloque <code>data-param</code> em cada link.</p>
+</section>
+
+<section class="card table-wrap">
+  <div class="pad"><h2 class="h-lg">Redes e plataformas</h2>
+  <p class="hint">Nas redes marcadas com “conferir”, os nomes dos campos (macros) variam. Troque o que está entre chaves pelos nomes que o painel da rede mostra. O código do clique é achado mesmo se o nome do campo for outro.</p></div>
+  <table class="links-table">
+    <thead><tr><th scope="col">Rede</th><th scope="col">Parâmetro no link</th><th scope="col">Onde colar e o quê</th></tr></thead>
+    <tbody>${Object.entries(NETWORKS).filter(([k]) => k !== "other").map(([k, n]) => {
+      const url = n.json ? pb(k) : `${pb(k)}?${n.query}`;
+      return html`<tr>
+        <td data-label="Rede"><strong>${n.name}</strong>${n.check ? html` <span class="badge badge-warning">conferir</span>` : ""}</td>
+        <td data-label="Parâmetro"><code>${n.param}</code></td>
+        <td data-label="URL"><div class="copy-row"><input value="${url}" readonly aria-label="URL de postback ${n.name}" spellcheck="false"><button class="btn btn-secondary btn-xs" type="button" data-copy="${url}">Copiar</button></div>
+          <p class="hint">${WHERE[k] || ""}</p></td>
+      </tr>`;
+    })}</tbody>
+  </table>
+</section>
+
+<section class="card pad">
+  <h2 class="h-lg">Google Ads</h2>
+  ${copyBox("g-template", "Modelo de rastreamento (no nível da conta ou da campanha)", gTemplate)}
+  <p class="hint">Troque <code>SEU-LINK</code> pelo final do seu link rastreado. O URL final do anúncio continua sendo a sua página; o link precisa ter como destino a mesma página (mesmo domínio).</p>
+  ${copyBox("g-script", "Script do gasto (Ferramentas → Ações em massa → Scripts → novo script; programe a cada hora)", googleAdsScript(`${base}/cost/${s.key}/google`), 10)}
+  <p class="hint">${last("google") ? `Último gasto recebido: ${fmtDateTime(last("google").last)} (${last("google").n} linhas).` : "Ainda não recebi gasto do Google Ads."}</p>
+  ${copyBox("g-conv", "Conversões offline (Metas → Conversões → Importar → agendar por HTTPS)", `${base}/export/${s.key}/google.csv`)}
+  <p class="hint">Crie no Google Ads uma ação de conversão de importação com o nome “${s.gads_conv_name}”. Assim o Google aprende com as vendas reais.</p>
+</section>
+
+<section class="card pad">
+  <h2 class="h-lg">NewsBreak</h2>
+  ${copyBox("nb-url", "URL do anúncio (Landing page URL)", nbUrl)}
+  <p class="hint">Troque <code>SEU-LINK</code> pelo final do seu link rastreado.</p>
+  <form method="post" action="/integrations/newsbreak-csv" class="stack" novalidate>
+    ${csrfField(c)}
+    <div class="field">
+      <label for="csv">Importar gasto (CSV do relatório da NewsBreak, por dia e por campanha)</label>
+      <textarea id="csv" name="csv" rows="6" spellcheck="false" placeholder="Date,Campaign Name,Spend&#10;2026-11-24,Oferta X - US,35.20" ${csvError ? raw('aria-invalid="true" aria-describedby="csv-err"') : ""}>${csvValue || ""}</textarea>
+      ${fieldError("csv-err", csvError)}
+      <p class="hint">Linhas repetidas só atualizam o valor. ${last("newsbreak") ? `Última importação: ${fmtDateTime(last("newsbreak").last)}.` : ""}</p>
+    </div>
+    <div class="field-row">
+      <div class="field"><label for="csv-cur">Moeda do CSV</label><select id="csv-cur" name="currency">${["USD", "BRL", "EUR"].map((x) => curOpt(x, "USD"))}</select></div>
+      <div class="field field-end"><button class="btn btn-primary" type="submit">Importar</button></div>
+    </div>
+  </form>
+</section>
+
+<section class="card pad">
+  <h2 class="h-lg">Lançar gasto à mão</h2>
+  <form method="post" action="/integrations/cost" class="field-row" novalidate>
+    ${csrfField(c)}
+    <div class="field"><label for="c-date">Data</label><input id="c-date" name="date" type="date" required></div>
+    <div class="field"><label for="c-src">Origem</label><select id="c-src" name="source"><option value="newsbreak">NewsBreak</option><option value="google">Google Ads</option><option value="other">Outros</option></select></div>
+    <div class="field grow"><label for="c-camp">Campanha</label><input id="c-camp" name="campaign" maxlength="200" placeholder="Nome na NewsBreak, ou ID no Google"></div>
+    <div class="field"><label for="c-amount">Valor</label><input id="c-amount" name="amount" inputmode="decimal" placeholder="35,20"></div>
+    <div class="field"><label for="c-cur">Moeda</label><select id="c-cur" name="currency">${["USD", "BRL", "EUR"].map((x) => curOpt(x, "USD"))}</select></div>
+    <div class="field field-end"><button class="btn btn-secondary" type="submit">Salvar</button></div>
+  </form>
+  ${fieldError("cost-err", costError)}
+</section>
+
+<section class="card pad narrow">
+  <h2 class="h-lg">Moeda e câmbio</h2>
+  ${settingsError ? html`<p class="alert alert-error" role="alert">${settingsError}</p>` : ""}
+  <form method="post" action="/integrations/settings" class="stack" novalidate>
+    ${csrfField(c)}
+    <div class="field-row">
+      <div class="field"><label for="currency">Mostrar valores em</label><select id="currency" name="currency">${["BRL", "USD", "EUR"].map((x) => curOpt(x, s.currency))}</select></div>
+      <div class="field"><label for="usd_brl">1 dólar = R$</label><input id="usd_brl" name="usd_brl" inputmode="decimal" value="${String(s.usd_brl).replace(".", ",")}"></div>
+      <div class="field"><label for="eur_brl">1 euro = R$</label><input id="eur_brl" name="eur_brl" inputmode="decimal" value="${String(s.eur_brl).replace(".", ",")}"></div>
+    </div>
+    <div class="field"><label for="gads_conv_name">Nome da conversão no Google Ads</label><input id="gads_conv_name" name="gads_conv_name" maxlength="100" value="${s.gads_conv_name}"></div>
+    <div class="field">
+      <label for="nb_postback">Postback da NewsBreak <span class="muted">(opcional)</span></label>
+      <input id="nb_postback" name="nb_postback" type="url" maxlength="1000" value="${s.nb_postback}" placeholder="https://…{clickid}…{value}">
+      <p class="hint">Cole a URL que a NewsBreak dá em Event management e troque o lugar do click ID por <code>{clickid}</code> e o do valor por <code>{value}</code> (em dólar). Cada venda vinda da NewsBreak é avisada a ela.</p>
+    </div>
+    <div class="row-end"><button class="btn btn-primary" type="submit">Salvar</button></div>
+  </form>
+</section>
+
+<section class="card pad narrow">
+  <h2 class="h-lg">Chave secreta</h2>
+  <p class="muted">Ela está em todas as URLs acima. Troque se alguém de fora a viu; depois atualize as redes e o script.</p>
+  <form method="post" action="/integrations/key" data-confirm="Trocar a chave? As URLs antigas param de funcionar na hora.">
+    ${csrfField(c)}<button class="btn btn-ghost danger-text" type="submit">Trocar chave</button>
+  </form>
+</section>`);
+}
+
+const WHERE = {
+  clickbank: "Integrações → Postback/Pixels → adicionar integração, evento de venda. Para reembolso, outra URL igual com &type=refund.",
+  buygoods: "Profile → Postback Pixels → Add New. Vale para todas as ofertas.",
+  digistore24: "Visão de afiliado → Conta → S2S Postback.",
+  maxweb: "Menu → Postback Pixels → Add new. Vale para todas as ofertas.",
+  gurumedia: "No painel da GuruMedia, campo de postback global ou da oferta; o click ID vai em sub1.",
+  smartadv: "Postback global no painel da rede; peça os macros ao gerente se não achar.",
+  smashloud: "Postback global no painel da rede; peça os macros ao gerente se não achar.",
+  clickadv: "Postback global no painel da rede; peça os macros ao gerente se não achar.",
+  hotmart: "Ferramentas → Webhook → Cadastrar. Eventos: compra aprovada, reembolso, chargeback. O código vai no sck (ou src, como afiliado).",
+  kiwify: "Apps → Webhooks → Criar webhook. Eventos: compra aprovada, reembolso, chargeback.",
+};

@@ -416,6 +416,78 @@ class E2E(unittest.TestCase):
         self.assertIn("script-src 'self'", r.headers.get("content-security-policy", ""))
         self.assertEqual(r.headers.get("x-frame-options"), "DENY")
 
+    # T: sales tracker
+    def tracker_key(self):
+        self.page.goto(self.base + "/integrations")
+        url = self.page.get_by_label("URL de postback BuyGoods").input_value()
+        return re.search(r"/pb/([\w-]+)/", url).group(1)
+
+    def test_t01_tracked_link_click_postback_results(self):
+        p = self.page
+        p.goto(self.base + "/links")
+        p.get_by_role("button", name="Novo link").first.click()
+        dlg = p.get_by_role("dialog")
+        dlg.get_by_label("Destino").fill("https://presell.exemplo.com/bolo")
+        dlg.get_by_label("Final do link").fill("bolo-g")
+        dlg.locator("summary", has_text="Rastrear vendas").click()
+        dlg.get_by_label("Gerar um código por clique").check()
+        dlg.get_by_label("Rede ou plataforma").select_option(label="ClickBank")
+        expect(dlg.get_by_label("Parâmetro do código")).to_have_value("tid")
+        dlg.get_by_role("button", name="Criar link").click()
+        expect(p.locator("tr.is-new")).to_contain_text("Rastreado · ClickBank")
+
+        status, loc = self.hit(self.base + "/bolo-g?src=google&cmp=9001&ad=77&gclid=GX&lp=https%3A%2F%2Fpresell.exemplo.com%2Fbolo%3Fv%3D2")
+        self.assertEqual(status, 302)
+        cid = re.search(r"tid=(ct[a-z2-7]{10})", loc).group(1)
+        self.assertTrue(loc.startswith("https://presell.exemplo.com/bolo?v=2"), loc)
+
+        key = self.tracker_key()
+        r = p.request.get(f"{self.base}/pb/{key}/clickbank?cid={cid}&amount=60&txid=CB1")
+        self.assertEqual(r.text(), "ok")
+        self.assertEqual(p.request.get(f"{self.base}/pb/{key}/clickbank?cid={cid}&amount=60&txid=CB1").text(), "ok (repetido)")
+        self.assertEqual(p.request.get(f"{self.base}/pb/nao-e-a-chave/clickbank?cid={cid}").status, 403)
+        cost = p.request.post(f"{self.base}/cost/{key}/google", data='{"currency":"USD","rows":[{"date":"%s","campaign_id":"9001","campaign_name":"Bolo EUA","cost_micros":20000000}]}'
+                              % time.strftime("%Y-%m-%d", time.gmtime(time.time() - 3 * 3600)),
+                              headers={"Content-Type": "application/json"})
+        self.assertEqual(cost.text(), "ok 1")
+
+        p.goto(self.base + "/results?p=today")
+        row = p.locator("tr", has_text="Bolo EUA")
+        expect(row).to_contain_text("Google Ads")
+        expect(row.locator("td[data-label=Vendas]")).to_have_text("1")
+        expect(row.locator("td[data-label=ROAS]")).to_have_text("3,00x")
+        p.get_by_role("link", name="Anúncios").click()
+        expect(p.locator("tr", has_text="77")).to_be_visible()
+
+        p.goto(self.base + "/sales?p=today")
+        expect(p.locator("tr", has=p.locator("td[data-label=Tipo]")).filter(has_text="pedido CB1")).to_contain_text("Venda")
+        expect(p.get_by_text(f"clique {cid}").first).to_be_visible()
+        csv = p.request.get(f"{self.base}/export/{key}/google.csv").text()
+        self.assertIn('"GX","Venda"', csv)
+
+    def test_t02_newsbreak_csv_and_settings(self):
+        p = self.page
+        p.goto(self.base + "/integrations")
+        p.get_by_label("Importar gasto").fill("Date,Campaign Name,Spend\n2026-11-20,NB teste,10.00")
+        p.get_by_role("button", name="Importar").click()
+        expect(p.get_by_text("1 linha(s) de gasto da NewsBreak importadas")).to_be_visible()
+        p.get_by_label("Importar gasto").fill("sem colunas")
+        p.get_by_role("button", name="Importar").click()
+        expect(p.locator("#csv-err")).to_be_visible()
+        p.goto(self.base + "/integrations")
+        p.get_by_label("1 dólar = R$").fill("0")
+        p.get_by_role("button", name="Salvar").last.click()
+        expect(p.get_by_role("alert")).to_contain_text("câmbio maior que zero")
+
+    def test_t03_tracker_pages_fit_mobile(self):
+        m = self.browser.new_context(viewport={"width": 390, "height": 844},
+                                     storage_state=self.ctx.storage_state()).new_page()
+        for path in ["/results", "/sales", "/integrations"]:
+            m.goto(self.base + path)
+            width = m.evaluate("document.documentElement.scrollWidth")
+            self.assertLessEqual(width, 390, f"{path} rola para o lado no celular")
+        m.context.close()
+
     # Layout
     def test_l1_mobile_width(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},

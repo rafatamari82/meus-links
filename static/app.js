@@ -51,6 +51,16 @@
       var picker = e.target.closest("details").querySelector(".geo-picker");
       if (picker) picker.hidden = e.target.value === "off";
     }
+    if (e.target.matches("[data-network]")) {
+      var opt = e.target.selectedOptions[0];
+      var inp = e.target.form.querySelector("[name=sub_param]");
+      if (opt && inp) inp.value = opt.getAttribute("data-param") || "";
+    }
+    if (e.target.matches("[data-range-preset]")) {
+      var box2 = e.target.form.querySelector(".range-custom");
+      if (box2) box2.hidden = e.target.value !== "custom";
+      if (e.target.value !== "custom") e.target.form.submit();
+    }
     if (e.target.matches("input[name=geo_countries]")) {
       var box = e.target.closest(".geo-picker");
       var n = box.querySelectorAll("input[name=geo_countries]:checked").length;

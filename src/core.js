@@ -11,6 +11,7 @@ const SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 export const RESERVED = new Set([
   "login", "logout", "setup", "links", "domains", "static", "internal",
   "design", "favicon.ico", "robots.txt", "health", "api", "admin",
+  "results", "sales", "integrations", "pb", "cost", "export", "t.js",
 ]);
 
 const BOT_RE = new RegExp(

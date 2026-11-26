@@ -36,6 +36,26 @@ export const SCHEMA = [
   `create index if not exists clicks_link_at on clicks(link_id, at)`,
   `create table if not exists login_attempts (ip text not null, at integer not null)`,
   `create index if not exists login_attempts_ip on login_attempts(ip, at)`,
+  // sales tracker
+  `create table if not exists tk_clicks (
+    id text primary key, link_id text references links(id) on delete set null, at text not null,
+    source text not null default 'other', campaign text, adset text, ad text, keyword text,
+    gclid text, nb_callback text, country text, device text)`,
+  `create index if not exists tk_clicks_at on tk_clicks(at)`,
+  `create table if not exists tk_conversions (
+    id text primary key, click_id text, network text not null, txid text not null,
+    type text not null check (type in ('sale','upsell','refund','chargeback')),
+    amount_cents integer not null default 0, currency text not null default 'USD', at text not null,
+    unique (network, txid, type))`,
+  `create index if not exists tk_conversions_at on tk_conversions(at)`,
+  `create index if not exists tk_conversions_click on tk_conversions(click_id)`,
+  `create table if not exists tk_costs (
+    date text not null, source text not null, campaign_key text not null, campaign_name text,
+    cost_cents integer not null default 0, currency text not null default 'BRL',
+    clicks integer not null default 0, impressions integer not null default 0, updated_at text not null,
+    primary key (date, source, campaign_key))`,
+  `create table if not exists tk_events (
+    id integer primary key autoincrement, at text not null, network text, outcome text not null, detail text, raw text)`,
 ];
 
 // Columns added after the first release. Each runs on its own; "duplicate column" means done.
@@ -46,4 +66,7 @@ export const MIGRATIONS = [
   `alter table clicks add column blocked integer not null default 0`,
   `alter table links add column geo_mode text not null default 'off'`,
   `alter table links add column geo_countries text not null default ''`,
+  `alter table links add column track integer not null default 0`,
+  `alter table links add column network text`,
+  `alter table links add column sub_param text`,
 ];

@@ -1,5 +1,6 @@
 // HTML views. Every interpolated value is escaped unless wrapped in raw().
 import { countryName, countryOptions } from "./core.js";
+import { NETWORKS } from "./tracker.js";
 
 class Raw {
   constructor(s) { this.s = s; }
@@ -25,7 +26,7 @@ export const fmtDate = (iso) => (iso ? dateFmt.format(new Date(iso)) : "—");
 export const fmtDateTime = (iso) => (iso ? dateTimeFmt.format(new Date(iso)).replace(",", "") : "—");
 
 const ICON = raw('<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9.5 14.5l5-5M8 11l-2 2a3.5 3.5 0 005 5l2-2M16 13l2-2a3.5 3.5 0 00-5-5l-2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
-const csrfField = (c) => html`<input type="hidden" name="csrf" value="${c.csrf}">`;
+export const csrfField = (c) => html`<input type="hidden" name="csrf" value="${c.csrf}">`;
 
 function head(title, assetVersion) {
   return html`<!doctype html>
@@ -55,7 +56,7 @@ export function page(c, title, body) {
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
     <a class="brand" href="/links">${ICON}<span>Meus links</span></a>
-    <nav>${nav("/links", "Links", c.section === "links")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
+    <nav>${nav("/results", "Resultados", c.section === "results")}${nav("/sales", "Vendas", c.section === "sales")}${nav("/links", "Links", c.section === "links")}${nav("/integrations", "Integrações", c.section === "integrations")}${nav("/domains", "Domínios", c.section === "domains")}</nav>
     <form method="post" action="/logout" class="sidebar-foot">${csrfField(c)}<button class="btn btn-ghost btn-sm" type="submit">Sair</button></form>
   </aside>
   <main class="main" id="main">${flashes(c)}${body}</main>
@@ -72,8 +73,8 @@ function authPage(c, title, body) {
 </main></body></html>`.s;
 }
 
-const fieldError = (id, msg) => (msg ? html`<p class="field-error" id="${id}">${msg}</p>` : "");
-const invalid = (id, msg) => (msg ? raw(`aria-invalid="true" aria-describedby="${id}"`) : "");
+export const fieldError = (id, msg) => (msg ? html`<p class="field-error" id="${id}">${msg}</p>` : "");
+export const invalid = (id, msg) => (msg ? raw(`aria-invalid="true" aria-describedby="${id}"`) : "");
 
 export function setupView(c, { errors = {}, email = "" }) {
   return authPage(c, "Primeiro acesso", html`
@@ -187,7 +188,32 @@ function linkFields(values, errors, domains, editing) {
     <div class="field"><label for="utm_campaign">Campanha</label><input id="utm_campaign" name="utm_campaign" maxlength="100" placeholder="black-friday" value="${v.utm_campaign}"></div>
   </div>
 </details>
-${geoFields(v, e)}`;
+${geoFields(v, e)}
+${trackFields(v, e)}`;
+}
+
+function trackFields(v, e) {
+  const on = v.track === "1" || v.track === 1;
+  const net = v.network || "clickbank";
+  return html`
+<details class="utm track" ${on || e.sub_param ? raw("open") : ""}>
+  <summary>Rastrear vendas ${on ? html`<span class="badge badge-accent">${NETWORKS[net]?.name || net}</span>` : ""}</summary>
+  <label class="check"><input type="checkbox" name="track" value="1" ${on ? raw("checked") : ""}> Gerar um código por clique e mandar para a rede</label>
+  <div class="field-row">
+    <div class="field">
+      <label for="network">Rede ou plataforma</label>
+      <select id="network" name="network" data-network>
+        ${Object.entries(NETWORKS).map(([k, n]) => html`<option value="${k}" data-param="${n.param}" ${k === net ? raw("selected") : ""}>${n.name}</option>`)}
+      </select>
+    </div>
+    <div class="field">
+      <label for="sub_param">Parâmetro do código</label>
+      <input id="sub_param" name="sub_param" maxlength="40" spellcheck="false" value="${v.sub_param || NETWORKS[net]?.param || ""}" ${invalid("sub-err", e.sub_param)}>
+      ${fieldError("sub-err", e.sub_param)}
+    </div>
+  </div>
+  <p class="hint">Se o destino é uma presell, deixe o parâmetro e cole o script de Integrações na presell.</p>
+</details>`;
 }
 
 function geoSummary(codes) {
@@ -222,6 +248,7 @@ export function linksView(c, { rows, total, q, domainFilter, domains, activeDoma
     <tr class="${l.id === newId ? "is-new" : ""}" data-link-id="${l.id}">
       <td data-label="Link">
         ${l.title ? html`<div class="link-title">${l.title}</div>` : ""}
+        ${l.track ? html`<div class="hint"><span class="badge badge-accent">Rastreado · ${NETWORKS[l.network]?.name || l.network}</span></div>` : ""}
         ${l.geo_mode && l.geo_mode !== "off" ? html`<div class="hint">${l.geo_mode === "block" ? "Bloqueado em" : "Só funciona em"} ${geoSummary(l.geo_countries)}</div>` : ""}
         <div class="short-row">
           <a class="short-url" href="${shortUrl(l)}" target="_blank" rel="noopener">${l.domain_name}/${l.slashtag}</a>

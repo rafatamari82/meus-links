@@ -1,0 +1,73 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import * as T from "../src/tracker.js";
+
+test("click IDs have the ct format and are found anywhere", () => {
+  const id = T.newClickId();
+  assert.match(id, /^ct[a-z2-7]{10}$/);
+  assert.deepEqual(T.findClickIds({ tid: id }, null), [id]);
+  assert.deepEqual(T.findClickIds({}, { data: { purchase: { origin: { sck: id.toUpperCase() } } } }), [id]);
+  assert.deepEqual(T.findClickIds({ s: `x_${id}_y` }, null), [id]);
+  assert.deepEqual(T.findClickIds({ s: "contract1234567" }, null), []);
+});
+
+test("tracked target adds the click ID, drops our keys, honours lp on the same host", () => {
+  const u = T.trackedTarget("https://presell.com/a", "?src=google&cmp=123&gclid=G&lp=https%3A%2F%2Fpresell.com%2Fb%3Fx%3D1", "tid", "ctaaaaaaaaaa");
+  const p = new URL(u);
+  assert.equal(p.pathname, "/b");
+  assert.equal(p.searchParams.get("tid"), "ctaaaaaaaaaa");
+  assert.equal(p.searchParams.get("x"), "1");
+  assert.equal(p.searchParams.get("gclid"), "G");
+  assert.equal(p.searchParams.get("cmp"), null);
+  const evil = T.trackedTarget("https://presell.com/a", "?lp=https%3A%2F%2Fevil.com%2F", "tid", "ctaaaaaaaaaa");
+  assert.equal(new URL(evil).hostname, "presell.com");
+});
+
+test("click params: source, unfilled macros skipped", () => {
+  const g = T.readClickParams(new URLSearchParams("cmp=111&adg=222&kw=x&gclid=abc"));
+  assert.equal(g.source, "google");
+  assert.equal(g.campaign, "111");
+  const nb = T.readClickParams(new URLSearchParams("src=newsbreak&cmp=__CAMPAIGN_NAME__&nbcb=cb1"));
+  assert.equal(nb.source, "newsbreak");
+  assert.equal(nb.campaign, null);
+  assert.equal(nb.nb_callback, "cb1");
+});
+
+test("money parsing", () => {
+  assert.equal(T.toCents("49.90"), 4990);
+  assert.equal(T.toCents("1.234,56"), 123456);
+  assert.equal(T.toCents("1,234.56"), 123456);
+  assert.equal(T.toCents("{COMMISSION_AMOUNT}"), null);
+  assert.equal(T.convert(1000, "USD", "BRL", { usd_brl: 5, eur_brl: 6 }), 5000);
+  assert.equal(T.convert(5000, "BRL", "USD", { usd_brl: 5, eur_brl: 6 }), 1000);
+});
+
+test("query postback (BuyGoods style)", () => {
+  const p = T.parsePostback("buygoods", { cid: "ctaaaaaaaaaa", amount: "87.50", txid: "B1", type: "upsell" }, null);
+  assert.deepEqual([p.type, p.amount_cents, p.txid, p.currency, p.ids[0]], ["upsell", 8750, "B1", "USD", "ctaaaaaaaaaa"]);
+  assert.equal(T.parsePostback("clickbank", { cid: "x", type: "refund" }, null).type, "refund");
+  assert.ok(T.parsePostback("maxweb", { type: "lead" }, null).ignore);
+});
+
+test("Hotmart webhook", () => {
+  const body = { event: "PURCHASE_APPROVED", data: { purchase: { transaction: "HP1", price: { value: 197, currency_value: "BRL" }, origin: { sck: "ctbbbbbbbbbb" } },
+    commissions: [{ value: 120.5, source: "AFFILIATE", currency_value: "BRL" }] } };
+  const p = T.parsePostback("hotmart", {}, body);
+  assert.deepEqual([p.type, p.amount_cents, p.txid, p.ids[0]], ["sale", 12050, "HP1", "ctbbbbbbbbbb"]);
+  assert.ok(T.parsePostback("hotmart", {}, { event: "PURCHASE_BILLET_PRINTED", data: {} }).ignore);
+  assert.equal(T.parsePostback("hotmart", {}, { event: "PURCHASE_REFUNDED", data: { purchase: { transaction: "HP1" } } }).type, "refund");
+});
+
+test("Kiwify webhook", () => {
+  const body = { order_id: "K1", order_status: "paid", Commissions: { my_commission: 4990, currency: "BRL" }, TrackingParameters: { sck: "ctcccccccccc" } };
+  const p = T.parsePostback("kiwify", {}, body);
+  assert.deepEqual([p.type, p.amount_cents, p.txid, p.ids[0]], ["sale", 4990, "K1", "ctcccccccccc"]);
+  assert.equal(T.parsePostback("kiwify", {}, { order_status: "chargedback" }).type, "chargeback");
+});
+
+test("cost CSV", () => {
+  const r = T.parseCostCsv('Date,Campaign Name,Impressions,Clicks,Spend\n11/24/2026,"Oferta, US",1000,40,"$35.20"\n2026-11-25,Outra,10,1,2');
+  assert.equal(r.rows.length, 2);
+  assert.deepEqual([r.rows[0].date, r.rows[0].campaign_key, r.rows[0].cost_cents, r.rows[0].clicks], ["2026-11-24", "Oferta, US", 3520, 40]);
+  assert.ok(T.parseCostCsv("a,b\n1,2").error);
+});

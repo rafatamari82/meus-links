@@ -12,6 +12,8 @@ import {
   readSession, safeEqual, signSession,
 } from "./security.js";
 import * as V from "./views.js";
+import * as TR from "./tracker-routes.js";
+import { cleanParam, NETWORKS } from "./tracker.js";
 
 const SESSION_DAYS = 30;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -206,6 +208,11 @@ async function serveShort(c, slashtag) {
     ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, allowed ? 0 : 1)];
     if (!bot && allowed) {
       writes.push(db.prepare("update links set clicks = clicks + 1, last_click_at = ? where id = ?").bind(ts, link.id));
+      if (link.track) {
+        const t = TR.trackClick(c, link, { country, device });
+        target = t.target;
+        writes.push(t.write);
+      }
     }
     // Record after answering: the visitor never waits for the database.
     c.exec.waitUntil(db.batch(writes).catch((e) => console.error("click not recorded", e)));
@@ -287,7 +294,12 @@ async function readLinkForm(c) {
     if (!(e instanceof core.ValidationError)) throw e;
     errors[e.field] = e.message;
   }
-  return { values, errors, dest, slug, domain, title, geo };
+  values.track = f.get("track") ? "1" : "";
+  values.network = NETWORKS[String(f.get("network"))] ? String(f.get("network")) : "other";
+  values.sub_param = String(f.get("sub_param") || "");
+  const track = { on: values.track ? 1 : 0, network: values.network, sub_param: cleanParam(values.sub_param) };
+  if (track.on && !track.sub_param) errors.sub_param = "Use só letras, números, ponto, hífen ou sublinhado (ex.: tid).";
+  return { values, errors, dest, slug, domain, title, geo, track };
 }
 
 async function listLinks(c, q = "", domainFilter = "") {
@@ -379,7 +391,7 @@ async function linksPage(c) {
 }
 
 async function createLink(c) {
-  const { values, errors, dest, slug, domain, title, geo } = await readLinkForm(c);
+  const { values, errors, dest, slug, domain, title, geo, track } = await readLinkForm(c);
   if (!Object.keys(errors).length) {
     const ts = now();
     const id = newId();
@@ -388,8 +400,8 @@ async function createLink(c) {
       const s = slug || core.randomSlug();
       try {
         await c.db.prepare(
-          "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, geo_mode, geo_countries, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?)",
-        ).bind(id, c.user.id, domain.id, s, s.toLowerCase(), dest, title, geo.mode, geo.countries, ts, ts).run();
+          "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, geo_mode, geo_countries, track, network, sub_param, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        ).bind(id, c.user.id, domain.id, s, s.toLowerCase(), dest, title, geo.mode, geo.countries, track.on, track.on ? track.network : null, track.on ? track.sub_param : null, ts, ts).run();
         c.flash("success", "Link criado.");
         return c.redirect(`/links?new=${id}`);
       } catch (e) {
@@ -412,6 +424,7 @@ async function editLink(c, id) {
   let values = {
     destination: link.destination, slashtag: link.slashtag, title: link.title || "", domain_id: link.domain_id,
     geo_mode: link.geo_mode || "off", geo_countries: link.geo_countries || "",
+    track: link.track ? "1" : "", network: link.network || "clickbank", sub_param: link.sub_param || "",
   };
   let errors = {};
   if (c.req.method === "POST") {
@@ -422,8 +435,9 @@ async function editLink(c, id) {
     if (!Object.keys(errors).length) {
       try {
         await c.db.prepare(
-          "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, geo_mode = ?, geo_countries = ?, updated_at = ? where id = ? and user_id = ?",
-        ).bind(r.dest, r.slug, r.slug.toLowerCase(), r.title, r.domain.id, r.geo.mode, r.geo.countries, now(), id, c.user.id).run();
+          "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, geo_mode = ?, geo_countries = ?, track = ?, network = ?, sub_param = ?, updated_at = ? where id = ? and user_id = ?",
+        ).bind(r.dest, r.slug, r.slug.toLowerCase(), r.title, r.domain.id, r.geo.mode, r.geo.countries, r.track.on,
+          r.track.on ? r.track.network : null, r.track.on ? r.track.sub_param : null, now(), id, c.user.id).run();
         c.flash("success", "Alterações salvas.");
         return c.redirect("/links");
       } catch (e) {
@@ -616,6 +630,11 @@ const PANEL_ROUTES = [
   ["POST", /^\/links\/([\w-]+)\/edit$/, editLink],
   ["POST", /^\/links\/([\w-]+)\/delete$/, deleteLink],
   ["GET", /^\/links\/([\w-]+)$/, linkStats],
+  ["GET", /^\/results$/, TR.resultsPage],
+  ["GET", /^\/sales$/, TR.salesPage],
+  ["POST", /^\/sales\/([\w-]+)\/delete$/, TR.deleteSale],
+  ["GET", /^\/integrations$/, (c) => TR.integrationsPage(c)],
+  ["POST", /^\/integrations\/(settings|key|newsbreak-csv|cost)$/, TR.integrationsPost],
   ["GET", /^\/domains$/, (c) => domainsPage(c)],
   ["POST", /^\/domains$/, addDomain],
   ["POST", /^\/domains\/([\w-]+)\/verify$/, verifyDomain],
@@ -636,6 +655,15 @@ async function handle(req, env, exec) {
   if (!c.isPanel()) return serveShort(c, decodePath(path.slice(1)));
 
   if (path === "/health") return new Response("ok", { headers: { "Content-Type": "text/plain" } });
+
+  // Machine endpoints: the secret key in the path is the credential, so no session or CSRF.
+  if (path === "/t.js") return TR.presellScript();
+  let m = path.match(/^\/pb\/([\w-]+)(?:\/([a-z0-9]+))?\/?$/);
+  if (m) return TR.postback(c, m[1], m[2] || "other");
+  m = path.match(/^\/cost\/([\w-]+)\/google$/);
+  if (m) return TR.googleCost(c, m[1]);
+  m = path.match(/^\/export\/([\w-]+)\/google\.csv$/);
+  if (m) return TR.googleConversionsCsv(c, m[1]);
 
   if (req.method === "POST") {
     const sent = (await c.form()).get("csrf");

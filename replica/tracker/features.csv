@@ -1,0 +1,41 @@
+feature,area,priority,original,clone,notes
+Sign up and log in,onboarding,must,yes,no,
+Connect Meta ad accounts,integrations,must,yes,no,own token for personal use
+Pull spend by campaign adset ad per day,meta,must,yes,no,Marketing API insights
+Webhook endpoint per sales platform,integrations,must,yes,no,unique secret URL
+Parse sales from the platforms you use,integrations,must,yes,no,which platforms? to confirm
+Store sales with status and UTMs,sales,must,yes,no,idempotent by order id
+Refunds and chargebacks update the sale,sales,must,yes,no,
+Extract campaign adset ad IDs from UTMs,attribution,must,yes,no,
+UTM code generator for Meta ads,setup,must,yes,no,Meta URL parameter macros
+Page script that keeps UTMs through the funnel,setup,must,yes,no,presell VSL checkout links
+Dashboard summary cards,dashboard,must,yes,no,revenue spend profit ROAS ROI CPA sales
+Date range filter,dashboard,must,yes,no,
+Campaigns table by level with sales and profit,meta,must,yes,no,
+Sales list with filters,sales,should,yes,no,
+Pause or activate campaign adset ad from the table,meta,should,yes,no,ads_management
+Edit budget from the table,meta,should,yes,no,
+Product cost taxes and fees for real profit,profit,should,yes,no,
+Daily chart on the dashboard,dashboard,should,yes,no,
+Currency conversion (USD sales vs BRL spend),profit,should,no,no,owner may sell in dollars
+Timezone handling,attribution,should,yes,no,
+Organic or no-UTM sales bucket,attribution,should,yes,no,
+Multiple dashboards,dashboard,could,yes,no,
+Automated rules,automation,could,yes,no,
+Duplicate campaign to another ad account,meta,could,yes,no,
+Google TikTok Kwai ads,integrations,could,yes,no,
+Send conversions back to Meta (CAPI),integrations,could,unknown,no,not confirmed in public sources
+Mobile app,platform,could,yes,skip,web first
+Dozens of ready platform integrations at once,integrations,could,yes,skip,start with the owner's platforms
+click ID por clique no link rastreado,tracking,must,no,no,substitui as UTMs da Meta
+script /t.js para presell,tracking,must,no,no,
+postback genérico das redes (ClickBank BuyGoods Digistore24 MaxWeb GuruMedia SmartADV SmashLoud ClickADV),sales,must,no,no,
+webhook JSON Hotmart e Kiwify,sales,must,no,no,
+reembolso e chargeback descontados,sales,must,yes,no,
+gasto do Google Ads por script,costs,must,no,no,
+gasto da NewsBreak por CSV,costs,must,no,no,
+gasto da NewsBreak por API,costs,could,no,no,endpoint não confirmado
+conversões offline do Google (CSV com gclid),feedback,should,no,no,
+postback para a NewsBreak,feedback,should,no,no,
+câmbio USD/EUR para BRL,costs,should,yes,no,
+log dos postbacks recebidos,sales,should,no,no,

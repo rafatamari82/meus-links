@@ -1,1 +1,1 @@
-{ "name": "meus-links", "private": true, "type": "module", "scripts": { "dev": "node dev/server.mjs", "test": "node --test tests/core.test.mjs" } }
+{ "name": "meus-links", "private": true, "type": "module", "scripts": { "dev": "node dev/server.mjs", "test": "node --test tests/core.test.mjs tests/tracker.test.mjs" } }
