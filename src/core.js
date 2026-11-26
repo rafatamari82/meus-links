@@ -135,3 +135,34 @@ export function addUtm(destination, utm) {
   const names = new Set(add.map(([k]) => k));
   return withQuery(destination, (pairs) => [...pairs.filter(([k]) => !names.has(decodeKey(k))), ...add]);
 }
+
+export const DEVICE_LABELS = { mobile: "Celular", tablet: "Tablet", desktop: "Computador" };
+
+/** Rough device and OS from the user agent. Good enough for a breakdown, not for fingerprinting. */
+export function parseDevice(userAgent) {
+  const ua = userAgent || "";
+  let os = null;
+  if (/iPhone|iPod/.test(ua)) os = "iPhone (iOS)";
+  else if (/iPad/.test(ua)) os = "iPad (iOS)";
+  else if (/Android/i.test(ua)) os = "Android";
+  else if (/CrOS/.test(ua)) os = "ChromeOS";
+  else if (/Windows/i.test(ua)) os = "Windows";
+  else if (/Macintosh|Mac OS X/.test(ua)) os = "Mac";
+  else if (/Linux/i.test(ua)) os = "Linux";
+  let device = null;
+  if (/iPad|Tablet/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua))) device = "tablet";
+  else if (/Mobi|iPhone|iPod|Android/i.test(ua)) device = "mobile";
+  else if (os) device = "desktop";
+  return { device, os };
+}
+
+let regionNames = null;
+export function countryName(code) {
+  if (!code || !/^[A-Z]{2}$/.test(code) || code === "XX" || code === "T1") return "Desconhecido";
+  try {
+    regionNames ??= new Intl.DisplayNames(["pt-BR"], { type: "region" });
+    return regionNames.of(code) || code;
+  } catch {
+    return code;
+  }
+}

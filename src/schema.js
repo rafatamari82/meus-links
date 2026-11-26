@@ -37,3 +37,10 @@ export const SCHEMA = [
   `create table if not exists login_attempts (ip text not null, at integer not null)`,
   `create index if not exists login_attempts_ip on login_attempts(ip, at)`,
 ];
+
+// Columns added after the first release. Each runs on its own; "duplicate column" means done.
+export const MIGRATIONS = [
+  `alter table clicks add column country text`,
+  `alter table clicks add column device text`,
+  `alter table clicks add column os text`,
+];

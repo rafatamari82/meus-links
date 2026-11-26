@@ -6,7 +6,7 @@
 
 import { ASSETS } from "./assets.js";
 import * as core from "./core.js";
-import { SCHEMA } from "./schema.js";
+import { MIGRATIONS, SCHEMA } from "./schema.js";
 import {
   checkPassword, cookie, domainToken, hashPassword, newId, parseCookies, randomToken,
   readSession, safeEqual, signSession,
@@ -29,7 +29,16 @@ const isForeignKey = (e) => /FOREIGN KEY constraint failed/i.test(String(e?.mess
 let schemaReady = null;
 async function ensureSchema(db) {
   if (!schemaReady) {
-    schemaReady = db.batch(SCHEMA.map((s) => db.prepare(s))).catch((e) => {
+    schemaReady = (async () => {
+      await db.batch(SCHEMA.map((s) => db.prepare(s)));
+      for (const m of MIGRATIONS) {
+        try {
+          await db.prepare(m).run();
+        } catch (e) {
+          if (!/duplicate column/i.test(String(e?.message || e))) throw e;
+        }
+      }
+    })().catch((e) => {
       schemaReady = null;
       throw e;
     });
@@ -177,8 +186,12 @@ async function serveShort(c, slashtag) {
       ref = new URL(c.req.headers.get("Referer") || "").hostname || null;
     } catch { /* no referrer */ }
     const ts = now();
-    const writes = [db.prepare("insert into clicks (link_id, at, referrer_host, user_agent, is_bot) values (?,?,?,?,?)")
-      .bind(link.id, ts, ref, ua, bot ? 1 : 0)];
+    // Cloudflare fills request.cf; the header is only a fallback for local runs.
+    const country = (c.req.cf?.country || (c.req.cf ? "" : c.req.headers.get("CF-IPCountry")) || "").toUpperCase().slice(0, 2) || null;
+    const { device, os } = core.parseDevice(ua);
+    const writes = [db.prepare(
+      "insert into clicks (link_id, at, referrer_host, user_agent, is_bot, country, device, os) values (?,?,?,?,?,?,?,?)",
+    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os)];
     if (!bot) {
       writes.push(db.prepare("update links set clicks = clicks + 1, last_click_at = ? where id = ?").bind(ts, link.id));
     }
@@ -420,9 +433,15 @@ async function linkStats(c, id) {
     "select coalesce(referrer_host, 'Direto ou desconhecido') as ref, count(*) as n from clicks where link_id = ? and is_bot = 0 group by ref order by n desc limit 10",
   ).bind(id).all()).results;
   const bots = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 1").bind(id).first()).n;
+  const breakdown = async (col) => (await c.db.prepare(
+    `select coalesce(${col}, '') as k, count(*) as n from clicks where link_id = ? and is_bot = 0 group by k order by n desc limit 10`,
+  ).bind(id).all()).results;
+  const countries = (await breakdown("country")).map((r) => ({ label: core.countryName(r.k), n: r.n }));
+  const devices = (await breakdown("device")).map((r) => ({ label: core.DEVICE_LABELS[r.k] || "Desconhecido", n: r.n }));
+  const systems = (await breakdown("os")).map((r) => ({ label: r.k || "Desconhecido", n: r.n }));
   const last30 = days.reduce((a, [, n]) => a + n, 0);
   return c.respond(V.statsView(c.view(), {
-    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, last30,
+    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, last30, countries, devices, systems,
   }));
 }
 

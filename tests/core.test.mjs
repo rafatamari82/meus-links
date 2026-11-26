@@ -64,3 +64,19 @@ test("html escapes", () => {
   assert.equal(esc(`<a href="x">'&`), "&lt;a href=&quot;x&quot;&gt;&#39;&amp;");
   assert.equal(String(html`<p>${"<b>"}</p>`), "<p>&lt;b&gt;</p>");
 });
+test("device and os", () => {
+  const iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 300.0";
+  assert.deepEqual(core.parseDevice(iphone), { device: "mobile", os: "iPhone (iOS)" });
+  assert.deepEqual(core.parseDevice("Mozilla/5.0 (Linux; Android 14; SM-S918B) Chrome/120 Mobile Safari/537.36"), { device: "mobile", os: "Android" });
+  assert.deepEqual(core.parseDevice("Mozilla/5.0 (Linux; Android 13; SM-X700) Chrome/120 Safari/537.36"), { device: "tablet", os: "Android" });
+  assert.deepEqual(core.parseDevice("Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)"), { device: "tablet", os: "iPad (iOS)" });
+  assert.deepEqual(core.parseDevice("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120"), { device: "desktop", os: "Windows" });
+  assert.deepEqual(core.parseDevice("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Safari/605"), { device: "desktop", os: "Mac" });
+  assert.deepEqual(core.parseDevice(""), { device: null, os: null });
+});
+test("country names in Portuguese", () => {
+  assert.equal(core.countryName("BR"), "Brasil");
+  assert.equal(core.countryName("US"), "Estados Unidos");
+  assert.equal(core.countryName("XX"), "Desconhecido");
+  assert.equal(core.countryName(""), "Desconhecido");
+});

@@ -197,6 +197,9 @@ export function linksView(c, { rows, total, q, domainFilter, domains, activeDoma
       <td data-label="Cliques" class="num"><a href="/links/${l.id}" aria-label="Estatísticas de ${l.slashtag}: ${l.clicks} cliques">${l.clicks}</a></td>
       <td data-label="Criado" class="nowrap">${fmtDate(l.created_at)}</td>
       <td class="actions-cell"><div class="actions">
+        <a class="btn btn-ghost btn-xs" href="/links/${l.id}" aria-label="Ver estatísticas de ${l.slashtag}">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Estatísticas</a>
         <a class="btn btn-secondary btn-xs" href="/links/${l.id}/edit" aria-label="Editar ${l.slashtag}">Editar</a>
         <form method="post" action="/links/${l.id}/delete" data-confirm="Apagar ${l.domain_name}/${l.slashtag}? Quem clicar nele vai ver “link não encontrado”.">
           ${csrfField(c)}
@@ -263,7 +266,15 @@ export function editView(c, { link, values, errors, activeDomains }) {
 </div>`);
 }
 
-export function statsView(c, { link, days, peak, refs, bots, last30 }) {
+function breakdownCard(title, rows, total) {
+  return html`<section class="card pad">
+  <h2 class="h-lg">${title}</h2>
+  ${rows.length ? html`<table class="simple"><tbody>${rows.map((r) => html`<tr><td>${r.label}</td><td class="num">${r.n}</td><td class="num muted">${total ? Math.round((r.n / total) * 100) : 0}%</td></tr>`)}</tbody></table>`
+    : html`<p class="muted">Nada ainda.</p>`}
+</section>`;
+}
+
+export function statsView(c, { link, days, peak, refs, bots, last30, countries = [], devices = [], systems = [] }) {
   const su = `${c.scheme}://${link.domain_name}/${link.slashtag}`;
   const bars = days.map(([label, n], i) => {
     const h = n ? (n / peak) * 110 : 0;
@@ -291,8 +302,14 @@ export function statsView(c, { link, days, peak, refs, bots, last30 }) {
   <table class="sr-only"><caption>Cliques por dia</caption><tbody>${days.map(([d, n]) => html`<tr><th scope="row">${d}</th><td>${n}</td></tr>`)}</tbody></table>`
     : html`<p class="muted">Ainda sem cliques nos últimos 30 dias.</p>`}
 </section>
+<div class="stats-grid">
+  ${breakdownCard("Países", countries, link.clicks)}
+  ${breakdownCard("Aparelho", devices, link.clicks)}
+  ${breakdownCard("Sistema", systems, link.clicks)}
+</div>
 <section class="card pad">
   <h2 class="h-lg">De onde vieram</h2>
+  <p class="hint">Instagram, WhatsApp e TikTok costumam não informar a origem: esses cliques aparecem como “Direto ou desconhecido”. Para separar canais, crie um link para cada lugar.</p>
   ${refs.length ? html`<table class="simple"><thead><tr><th scope="col">Origem</th><th scope="col" class="num">Cliques</th></tr></thead>
   <tbody>${refs.map((r) => html`<tr><td>${r.ref}</td><td class="num">${r.n}</td></tr>`)}</tbody></table>` : html`<p class="muted">Nada ainda.</p>`}
   ${bots ? html`<p class="hint">${bots} ${bots === 1 ? "acesso de robôs e prévias de redes sociais não entrou" : "acessos de robôs e prévias de redes sociais não entraram"} na contagem.</p>` : ""}

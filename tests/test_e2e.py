@@ -293,6 +293,26 @@ class E2E(unittest.TestCase):
         expect(p.locator(".stat-value").first).to_have_text("1")
         expect(p.get_by_text(re.compile("1 acesso de robôs"))).to_be_visible()
 
+    def test_f05_country_device_breakdown(self):
+        self.create("https://exemplo.com/paises", "paises", "Países")
+        iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148"
+        for ua, cc in [(iphone, "BR"), (iphone, "BR"), (HUMAN_UA, "US")]:
+            self.page.request.get(self.base + "/paises", max_redirects=0,
+                                  headers={"User-Agent": ua, "CF-IPCountry": cc})
+        p = self.page
+        p.goto(self.base + "/links?q=paises")
+        p.get_by_role("link", name="Ver estatísticas de paises").click()
+        paises = p.get_by_role("region", name="Países") if False else p.locator("section", has=p.get_by_role("heading", name="Países"))
+        expect(paises).to_contain_text("Brasil")
+        expect(paises.get_by_role("row", name=re.compile("Brasil"))).to_contain_text("67%")
+        expect(paises).to_contain_text("Estados Unidos")
+        aparelho = p.locator("section", has=p.get_by_role("heading", name="Aparelho"))
+        expect(aparelho.get_by_role("row", name=re.compile("Celular"))).to_contain_text("2")
+        expect(aparelho).to_contain_text("Computador")
+        sistema = p.locator("section", has=p.get_by_role("heading", name="Sistema"))
+        expect(sistema).to_contain_text("iPhone (iOS)")
+        expect(sistema).to_contain_text("Mac")
+
     # F08 search
     def test_f08_search(self):
         self.create("https://exemplo.com/a", "busca-alpha", "Alpha")
