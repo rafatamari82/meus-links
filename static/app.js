@@ -76,6 +76,65 @@
       item.hidden = q && name.indexOf(q) < 0;
     });
   });
+  // App Cutti: service worker and push notifications.
+  var canPush = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  if ("serviceWorker" in navigator && document.body && document.body.classList.contains("panel")) {
+    navigator.serviceWorker.register("/sw.js").catch(function () {});
+  }
+  function keyBytes(k) {
+    var s = atob(k.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((k.length + 3) % 4));
+    var a = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i);
+    return a;
+  }
+  function deviceLabel() {
+    var ua = navigator.userAgent;
+    if (/iphone/i.test(ua)) return "iPhone";
+    if (/ipad/i.test(ua)) return "iPad";
+    if (/android/i.test(ua)) return "Android";
+    if (/mac/i.test(ua)) return "Mac";
+    if (/windows/i.test(ua)) return "Windows";
+    return "Aparelho";
+  }
+  function setupPush() {
+    var form = document.querySelector("[data-push]");
+    if (!form) return;
+    var btn = form.querySelector("[data-push-enable]");
+    var status = form.querySelector("[data-push-status]");
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    var standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
+    if (!canPush) {
+      btn.disabled = true;
+      status.textContent = ios && !standalone
+        ? "No iPhone, primeiro adicione o Cutti à Tela de Início e abra pelo ícone. Depois toque aqui."
+        : "Este navegador não aceita notificações. Use o Chrome no Android ou o app instalado no iPhone.";
+      return;
+    }
+    btn.addEventListener("click", function () {
+      btn.classList.add("is-loading");
+      status.textContent = "Pedindo permissão…";
+      Notification.requestPermission().then(function (perm) {
+        if (perm !== "granted") throw new Error("Você não permitiu as notificações. Libere nas configurações do aparelho e tente de novo.");
+        return navigator.serviceWorker.register("/sw.js").then(function () { return navigator.serviceWorker.ready; });
+      }).then(function (reg) {
+        return reg.pushManager.getSubscription().then(function (sub) {
+          return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(form.getAttribute("data-push-key")) });
+        });
+      }).then(function (sub) {
+        var j = sub.toJSON();
+        form.elements.endpoint.value = j.endpoint;
+        form.elements.p256dh.value = j.keys.p256dh;
+        form.elements.auth.value = j.keys.auth;
+        form.elements.label.value = deviceLabel();
+        form.submit();
+      }).catch(function (err) {
+        btn.classList.remove("is-loading");
+        status.textContent = err && err.message && /permit|Libere/.test(err.message) ? err.message : "Não consegui ativar: " + (err && err.message || "erro");
+      });
+    });
+  }
+  document.addEventListener("DOMContentLoaded", setupPush);
+
   document.addEventListener("DOMContentLoaded", function () {
     var d = document.querySelector("dialog[data-open-on-load]");
     if (d && d.showModal) {

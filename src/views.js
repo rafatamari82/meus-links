@@ -35,7 +35,13 @@ function head(title, assetVersion) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>${title} · Meus links</title>
+  <title>${title} · Cutti</title>
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <meta name="theme-color" content="#0f6b5c">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Cutti">
   <link rel="stylesheet" href="/static/tokens.css?v=${assetVersion}">
   <link rel="stylesheet" href="/static/app.css?v=${assetVersion}">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">

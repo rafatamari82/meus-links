@@ -616,7 +616,8 @@ function notFound(c) {
 function serveAsset(c, name) {
   const a = ASSETS[name];
   if (!a) return notFound(c);
-  return new Response(a.body, {
+  const body = a.b64 ? Uint8Array.from(atob(a.body), (ch) => ch.charCodeAt(0)) : a.body;
+  return new Response(body, {
     headers: { "Content-Type": a.type, "Cache-Control": "public, max-age=31536000, immutable", ETag: `"${a.etag}"` },
   });
 }
@@ -634,7 +635,7 @@ const PANEL_ROUTES = [
   ["GET", /^\/sales$/, TR.salesPage],
   ["POST", /^\/sales\/([\w-]+)\/delete$/, TR.deleteSale],
   ["GET", /^\/integrations$/, (c) => TR.integrationsPage(c)],
-  ["POST", /^\/integrations\/(settings|key|newsbreak-csv|cost|ntfy|telegram|notify-test|notify-prefs)$/, TR.integrationsPost],
+  ["POST", /^\/integrations\/(settings|key|newsbreak-csv|cost|ntfy|telegram|notify-test|notify-prefs|push-subscribe|push-delete-[\w-]+)$/, TR.integrationsPost],
   ["GET", /^\/domains$/, (c) => domainsPage(c)],
   ["POST", /^\/domains$/, addDomain],
   ["POST", /^\/domains\/([\w-]+)\/verify$/, verifyDomain],
@@ -658,6 +659,9 @@ async function handle(req, env, exec) {
 
   // Machine endpoints: the secret key in the path is the credential, so no session or CSRF.
   if (path === "/t.js") return TR.presellScript();
+  if (path === "/sw.js") {
+    return new Response(ASSETS["sw.js"].body, { headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" } });
+  }
   let m = path.match(/^\/pb\/([\w-]+)(?:\/([a-z0-9]+))?\/?$/);
   if (m) return TR.postback(c, m[1], m[2] || "other");
   m = path.match(/^\/cost\/([\w-]+)\/google$/);

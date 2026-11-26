@@ -497,6 +497,28 @@ class E2E(unittest.TestCase):
         p.locator("#avisos").get_by_role("button", name="Desligar").click()
         expect(p.get_by_role("button", name="Ativar ntfy")).to_be_visible()
 
+    def test_t05_cutti_app_install_and_push(self):
+        p = self.page
+        self.assertEqual(p.request.get(self.base + "/static/manifest.webmanifest").json()["name"], "Cutti")
+        icon = p.request.get(self.base + "/static/icon-192.png")
+        self.assertEqual(icon.headers["content-type"], "image/png")
+        self.assertEqual(icon.body()[:4], b"\x89PNG")
+        self.assertIn("showNotification", p.request.get(self.base + "/sw.js").text())
+        p.goto(self.base + "/integrations")
+        expect(p.get_by_role("button", name="Ativar avisos neste aparelho")).to_be_visible()
+        csrf = p.locator("[data-push] input[name=csrf]").input_value()
+        fake = {"csrf": csrf, "endpoint": "https://push.example.com/send/abc123xyz",
+                "p256dh": "B" + "A" * 86, "auth": "QUFBQUFBQUFBQUFBQUFBQQ", "label": "iPhone"}
+        r = p.request.post(self.base + "/integrations/push-subscribe", form=fake)
+        self.assertEqual(r.status, 200)
+        p.goto(self.base + "/integrations")
+        box = p.locator(".notify-main")
+        expect(box).to_contain_text("iPhone")
+        expect(box).to_contain_text("1 aparelho(s)")
+        box.get_by_role("button", name="Remover").click()
+        expect(p.get_by_text("Aparelho removido")).to_be_visible()
+        expect(p.locator(".notify-main")).not_to_contain_text("ativado em")
+
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
                                      storage_state=self.ctx.storage_state()).new_page()

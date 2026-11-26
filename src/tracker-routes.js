@@ -1,6 +1,7 @@
 // Sales tracker: public endpoints (postback, cost, scripts) and panel pages.
 import * as T from "./tracker.js";
-import { randomToken, safeEqual } from "./security.js";
+import { newId, randomToken, safeEqual } from "./security.js";
+import { newVapidKeys, sendPush } from "./webpush.js";
 import * as TV from "./tracker-views.js";
 
 const nowIso = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -13,8 +14,18 @@ export async function getSettings(db) {
     await db.prepare("insert or ignore into settings (key, value) values ('tk_key', ?)").bind(randomToken(24)).run();
     s.key = (await db.prepare("select value from settings where key = 'tk_key'").first()).value;
   }
+  if (!s.vapid_pub || !s.vapid_priv) {
+    const k = await newVapidKeys();
+    await db.batch([
+      db.prepare("insert or ignore into settings (key, value) values ('tk_vapid_priv', ?)").bind(k.privateJwk),
+      db.prepare("insert or ignore into settings (key, value) values ('tk_vapid_pub', ?)").bind(k.publicKey),
+    ]);
+    s.vapid_priv = (await db.prepare("select value from settings where key = 'tk_vapid_priv'").first()).value;
+    s.vapid_pub = (await db.prepare("select value from settings where key = 'tk_vapid_pub'").first()).value;
+  }
   return {
     key: s.key,
+    vapid: { privateJwk: s.vapid_priv, publicKey: s.vapid_pub },
     currency: T.CURRENCIES.includes(s.currency) ? s.currency : "BRL",
     usd_brl: Number(s.usd_brl) > 0 ? Number(s.usd_brl) : 5.4,
     eur_brl: Number(s.eur_brl) > 0 ? Number(s.eur_brl) : 6.2,
@@ -108,7 +119,7 @@ export async function postback(c, key, network) {
 
   // Phone notification.
   if (!dup && (p.type === "sale" || p.type === "upsell" || s.notify_refunds)) {
-    c.exec.waitUntil(saleMessage(c.db, network, p, click).then((m) => notify(s, m, c.env.__notifyFetch || fetch)).catch((e) => console.error("notify", e)));
+    c.exec.waitUntil(saleMessage(c.db, network, p, click).then((m) => notify(c.db, s, m, c.env.__notifyFetch || fetch)).catch((e) => console.error("notify", e)));
   }
 
   // Tell NewsBreak about the sale, so its algorithm learns from it.
@@ -139,8 +150,26 @@ async function saleMessage(db, network, p, click) {
 }
 
 /** Send to every channel that is set up. Returns a list of errors (empty when all went out). */
-export async function notify(s, m, fetcher = fetch) {
+export async function notify(db, s, m, fetcher = fetch) {
   const jobs = [];
+  const subs = (await db.prepare("select * from push_subs").all()).results;
+  if (subs.length) {
+    const owner = await db.prepare("select email from users limit 1").first();
+    const subject = `mailto:${owner?.email || "dono@cutti.us"}`;
+    for (const sub of subs) {
+      jobs.push(sendPush(sub, { title: m.title, body: m.body, url: "/sales" }, s.vapid, subject, fetcher).then(async (st) => {
+        if (st === 404 || st === 410) {
+          await db.prepare("delete from push_subs where id = ?").bind(sub.id).run();
+          return `${sub.label || "aparelho"} saiu (removido)`;
+        }
+        if (st >= 200 && st < 300) {
+          await db.prepare("update push_subs set last_ok_at = ? where id = ?").bind(nowIso(), sub.id).run();
+          return null;
+        }
+        return `${sub.label || "aparelho"} respondeu ${st}`;
+      }));
+    }
+  }
   if (s.ntfy_topic) {
     jobs.push(fetcher("https://ntfy.sh/", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -359,8 +388,9 @@ export async function integrationsPage(c, extra = {}, status = 200) {
   const d = await c.db.prepare("select full_name from domains where user_id = ? and active = 1 order by is_default desc, type asc limit 1")
     .bind(c.user.id).first();
   const costCount = (await c.db.prepare("select source, count(*) as n, max(updated_at) as last from tk_costs group by source").all()).results;
+  const devices = (await c.db.prepare("select id, label, created_at, last_ok_at from push_subs order by created_at").all()).results;
   return c.respond(TV.integrationsView(c.view(), {
-    s, base: `https://${c.panelHost()}`, linkDomain: d?.full_name || c.panelHost(), costCount, ...extra,
+    s, base: `https://${c.panelHost()}`, linkDomain: d?.full_name || c.panelHost(), costCount, devices, ...extra,
   }), status);
 }
 
@@ -401,13 +431,30 @@ export async function integrationsPost(c, action) {
     }
   } else if (action === "notify-test") {
     const s = await getSettings(c.db);
-    const r = await notify(s, { title: "💰 Venda! US$ 87,50", body: "Teste do cutti.us · Google Ads · Campanha exemplo" }, c.env.__notifyFetch || fetch);
+    const r = await notify(c.db, s, { title: "💰 Venda! US$ 87,50", body: "Teste do cutti.us · Google Ads · Campanha exemplo" }, c.env.__notifyFetch || fetch);
     if (!r.sent) c.flash("error", "Nenhum aviso configurado ainda.");
     else if (r.errors.length) c.flash("error", `Não foi: ${r.errors.join("; ")}`);
     else c.flash("success", "Aviso de teste enviado. Olhe o celular.");
   } else if (action === "notify-prefs") {
     await setSetting(c.db, "notify_refunds", f.get("refunds") ? "1" : "0");
     c.flash("success", "Preferência salva.");
+  } else if (action === "push-subscribe") {
+    const endpoint = String(f.get("endpoint") || "");
+    const p256dh = String(f.get("p256dh") || "");
+    const auth = String(f.get("auth") || "");
+    if (!/^https:\/\/\S{10,1000}$/.test(endpoint) || !/^[\w-]{80,100}$/.test(p256dh) || !/^[\w-]{16,30}$/.test(auth)) {
+      c.flash("error", "Não consegui ativar neste aparelho. Tente de novo.");
+      return c.redirect("/integrations#avisos");
+    }
+    const label = String(f.get("label") || "Aparelho").slice(0, 60);
+    await c.db.prepare(
+      "insert into push_subs (id, endpoint, p256dh, auth, label, created_at) values (?,?,?,?,?,?) on conflict(endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth, label = excluded.label",
+    ).bind(newId(), endpoint, p256dh, auth, label, nowIso()).run();
+    c.flash("success", `Avisos ativados neste aparelho (${label}). Toque em Testar aviso.`);
+    return c.redirect("/integrations#avisos");
+  } else if (action.startsWith("push-delete-")) {
+    await c.db.prepare("delete from push_subs where id = ?").bind(action.slice(12)).run();
+    c.flash("success", "Aparelho removido.");
   } else if (action === "key") {
     await setSetting(c.db, "key", randomToken(24));
     c.flash("success", "Chave trocada. Atualize as URLs de postback nas redes e o script do Google Ads.");

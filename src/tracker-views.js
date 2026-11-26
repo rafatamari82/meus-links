@@ -159,7 +159,7 @@ function copyBox(id, label, value, rows = 0) {
 </div>`;
 }
 
-export function integrationsView(c, { s, base, linkDomain, costCount, settingsError, csvError, csvValue, costError, tgError }) {
+export function integrationsView(c, { s, base, linkDomain, costCount, settingsError, csvError, csvValue, costError, tgError, devices = [] }) {
   const pb = (net) => `${base}/pb/${s.key}/${net}`;
   const last = (src) => costCount.find((x) => x.source === src);
   const curOpt = (v, sel) => html`<option ${v === sel ? raw("selected") : ""}>${v}</option>`;
@@ -178,7 +178,7 @@ export function integrationsView(c, { s, base, linkDomain, costCount, settingsEr
   <p class="hint">Se você usa presell, cole este script na presell. Ele passa o código para os links da oferta: <code>&lt;script src="${base}/t.js" data-param="tid" defer&gt;&lt;/script&gt;</code>. Troque <code>tid</code> pelo parâmetro da rede, ou coloque <code>data-param</code> em cada link.</p>
 </section>
 
-${notifySection(c, s, tgError)}
+${notifySection(c, s, tgError, devices)}
 
 <section class="card table-wrap">
   <div class="pad"><h2 class="h-lg">Redes e plataformas</h2>
@@ -282,14 +282,31 @@ const WHERE = {
   kiwify: "Apps → Webhooks → Criar webhook. Eventos: compra aprovada, reembolso, chargeback.",
 };
 
-function notifySection(c, s, tgError) {
+function notifySection(c, s, tgError, devices) {
   const tgOn = s.tg_token && s.tg_chat;
-  const any = s.ntfy_topic || tgOn;
+  const any = s.ntfy_topic || tgOn || devices.length;
   return html`
 <section class="card pad" id="avisos">
   <h2 class="h-lg">Avisos de venda no celular</h2>
-  <p class="muted">Cada venda (e, se quiser, cada reembolso) chega como notificação no celular, com valor, rede e campanha. Use um dos dois, ou os dois.</p>
+  <p class="muted">Cada venda (e, se quiser, cada reembolso) chega como notificação no celular, com valor, rede e campanha. Use um jeito só ou vários.</p>
   <div class="notify-grid">
+    <div class="notify-box notify-main">
+      <h3 class="h-md">App Cutti ${devices.length ? html`<span class="badge badge-success">${devices.length} aparelho(s)</span>` : html`<span class="badge badge-accent">recomendado</span>`}</h3>
+      <p class="hint">O próprio painel vira um app no celular, com ícone na tela de início e notificação de venda. Grátis, sem loja de apps.</p>
+      <ol class="steps">
+        <li><strong>iPhone:</strong> abra <code>app.cutti.us</code> no Safari, toque em Compartilhar → <strong>Adicionar à Tela de Início</strong>, e abra o Cutti pelo ícone novo.</li>
+        <li><strong>Android:</strong> abra no Chrome e toque em <strong>Instalar app</strong> (ou menu ⋮ → Adicionar à tela inicial).</li>
+        <li>Dentro do app, venha até aqui e toque no botão abaixo. Permita as notificações.</li>
+      </ol>
+      <form method="post" action="/integrations/push-subscribe" data-push data-push-key="${s.vapid.publicKey}">
+        ${csrfField(c)}
+        <input type="hidden" name="endpoint"><input type="hidden" name="p256dh"><input type="hidden" name="auth"><input type="hidden" name="label">
+        <button class="btn btn-primary" type="button" data-push-enable>Ativar avisos neste aparelho</button>
+        <p class="hint" data-push-status role="status"></p>
+      </form>
+      ${devices.length ? html`<table class="simple"><tbody>${devices.map((d) => html`<tr><td>${d.label || "Aparelho"}<div class="hint">ativado em ${fmtDateTime(d.created_at)}${d.last_ok_at ? ` · último aviso ${fmtDateTime(d.last_ok_at)}` : ""}</div></td>
+        <td class="actions-cell"><form method="post" action="/integrations/push-delete-${d.id}">${csrfField(c)}<button class="btn btn-ghost btn-xs danger-text" type="submit">Remover</button></form></td></tr>`)}</tbody></table>` : ""}
+    </div>
     <div class="notify-box">
       <h3 class="h-md">App ntfy ${s.ntfy_topic ? html`<span class="badge badge-success">Ligado</span>` : ""}</h3>
       ${s.ntfy_topic ? html`

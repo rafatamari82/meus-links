@@ -54,6 +54,9 @@ export const SCHEMA = [
     cost_cents integer not null default 0, currency text not null default 'BRL',
     clicks integer not null default 0, impressions integer not null default 0, updated_at text not null,
     primary key (date, source, campaign_key))`,
+  `create table if not exists push_subs (
+    id text primary key, endpoint text not null unique, p256dh text not null, auth text not null,
+    label text, created_at text not null, last_ok_at text)`,
   `create table if not exists tk_events (
     id integer primary key autoincrement, at text not null, network text, outcome text not null, detail text, raw text)`,
 ];
