@@ -287,13 +287,16 @@ export function normDate(raw) {
   return null;
 }
 
-/** Google Ads script the owner pastes in Tools > Scripts. Runs hourly and posts the last 7 days of cost. */
+/** Google Ads script the owner pastes in Tools > Scripts, scheduled hourly.
+ * Sends cost per campaign, then uploads the sales Cutti hands back as offline conversions (no API token needed). */
 export function googleAdsScript(endpoint) {
-  return `// Manda o gasto por campanha para o cutti.us. Programe para rodar a cada hora.
+  return `// Cutti: manda o gasto por campanha e sobe as vendas para o Google Ads.
+// Cole em Ferramentas > Ações em massa > Scripts, autorize e programe "A cada hora".
 var ENDPOINT = ${JSON.stringify(endpoint)};
 
 function main() {
-  var tz = AdsApp.currentAccount().getTimeZone();
+  var account = AdsApp.currentAccount();
+  var tz = account.getTimeZone();
   var today = new Date();
   var from = new Date(today.getTime() - 7 * 864e5);
   var fmt = function (d) { return Utilities.formatDate(d, tz, "yyyy-MM-dd"); };
@@ -304,19 +307,44 @@ function main() {
   while (it.hasNext()) {
     var r = it.next();
     rows.push({
-      date: r.segments.date,
-      campaign_id: String(r.campaign.id),
-      campaign_name: r.campaign.name,
-      cost_micros: Number(r.metrics.costMicros || 0),
-      clicks: Number(r.metrics.clicks || 0),
-      impressions: Number(r.metrics.impressions || 0)
+      date: r.segments.date, campaign_id: String(r.campaign.id), campaign_name: r.campaign.name,
+      cost_micros: Number(r.metrics.costMicros || 0), clicks: Number(r.metrics.clicks || 0), impressions: Number(r.metrics.impressions || 0)
     });
   }
   var res = UrlFetchApp.fetch(ENDPOINT, {
     method: "post", contentType: "application/json", muteHttpExceptions: true,
-    payload: JSON.stringify({ currency: AdsApp.currentAccount().getCurrencyCode(), rows: rows })
+    payload: JSON.stringify({ currency: account.getCurrencyCode(), rows: rows, want_conversions: true })
   });
-  Logger.log(res.getResponseCode() + " " + res.getContentText());
+  Logger.log("Gasto: " + res.getResponseCode() + " " + rows.length + " linha(s)");
+  if (res.getResponseCode() !== 200) return;
+  var data = JSON.parse(res.getContentText());
+  var list = data.conversions || [];
+  if (!list.length) { Logger.log("Nenhuma venda nova para o Google."); return; }
+
+  var ids = [];
+  try {
+    var up = AdsApp.bulkUploads().newCsvUpload(
+      ["Google Click ID", "Conversion Name", "Conversion Time", "Conversion Value", "Conversion Currency"],
+      { moneyInMicros: false, timeZone: "America/Sao_Paulo" });
+    up.forOfflineConversions();
+    for (var i = 0; i < list.length; i++) {
+      up.append({
+        "Google Click ID": list[i].gclid, "Conversion Name": data.conversion_name,
+        "Conversion Time": list[i].time, "Conversion Value": list[i].value, "Conversion Currency": list[i].currency
+      });
+      ids.push(list[i].id);
+    }
+    up.apply();
+    Logger.log("Vendas enviadas ao Google: " + ids.length);
+    ack({ ids: ids });
+  } catch (e) {
+    Logger.log("Erro ao enviar vendas: " + e);
+    ack({ ids: [], error: String(e) });
+  }
+}
+
+function ack(body) {
+  UrlFetchApp.fetch(ENDPOINT + "/ack", { method: "post", contentType: "application/json", muteHttpExceptions: true, payload: JSON.stringify(body) });
 }
 `;
 }

@@ -134,6 +134,13 @@
     });
   }
   document.addEventListener("DOMContentLoaded", setupPush);
+  // Open the collapsed box a link points into (e.g. /tracking#google after connecting).
+  document.addEventListener("DOMContentLoaded", function () {
+    if (!location.hash) return;
+    var el = document.getElementById(location.hash.slice(1));
+    for (var d = el && el.closest("details"); d; d = d.parentElement && d.parentElement.closest("details")) d.open = true;
+    if (el) el.scrollIntoView();
+  });
 
   // Notification text editor: live preview and variable chips.
   var lastTpl = null;

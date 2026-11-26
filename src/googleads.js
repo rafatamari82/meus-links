@@ -409,11 +409,8 @@ export async function googleBox(c, s, extra = {}) {
         <form method="post" action="/tracking/google/sync">${csrfField(cv)}<button class="btn btn-secondary btn-sm" type="submit">Sincronizar agora</button></form>
         <form method="post" action="/tracking/google/disconnect" data-confirm="Desconectar o Google Ads? O gasto para de chegar sozinho.">${csrfField(cv)}<button class="btn btn-ghost btn-sm danger-text" type="submit">Desconectar</button></form>
       </div>
-      <p class="hint">Com a conta conectada, o script do gasto e o arquivo de conversões abaixo não são mais necessários. Se usar os dois, o gasto não duplica, mas a conversão sim: apague o agendamento do arquivo no Google Ads.</p>
+      <p class="hint">Com a API conectada, apague o script do Cutti no Google Ads (Ferramentas → Scripts). Os dois juntos não duplicam o gasto, mas é melhor ter um caminho só.</p>
     </div>`;
   }
-  return html`<section class="card pad" id="google">
-  <h2 class="h-lg">Conectar Google Ads</h2>
-  ${inner}
-</section>`;
+  return html`<div id="google">${inner}</div>`;
 }

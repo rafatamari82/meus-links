@@ -31,7 +31,7 @@ export async function getSettings(db) {
     usd_brl: Number(s.usd_brl) > 0 ? Number(s.usd_brl) : 5.4,
     eur_brl: Number(s.eur_brl) > 0 ? Number(s.eur_brl) : 6.2,
     nb_postback: s.nb_postback || "",
-    gads_conv_name: s.gads_conv_name || "Venda",
+    gads_conv_name: s.gads_conv_name || "Cutti - Venda",
     ntfy_topic: s.ntfy_topic || "",
     tg_token: s.tg_token || "",
     tg_chat: s.tg_chat || "",
@@ -41,6 +41,7 @@ export async function getSettings(db) {
     rate_auto: s.rate_auto !== "0",
     rate_at: s.rate_at || "",
     rate_src: s.rate_src || "",
+    gscript_at: s.gscript_at || "",
     email_on: s.email_on !== "0",
     templates: Object.fromEntries(Object.entries(T.TEMPLATE_DEFAULTS).map(([k, d]) => [k, s[`tpl_${k}`] || d])),
   };
@@ -388,8 +389,40 @@ export async function googleCost(c, key) {
     }, ts));
   }
   for (let i = 0; i < stmts.length; i += 50) await c.db.batch(stmts.slice(i, i + 50));
-  await logEvent(c.db, "google-ads", "ok", `gasto: ${stmts.length} linha(s)`, "");
-  return text(`ok ${stmts.length}`);
+  await setSetting(c.db, "gscript_at", ts);
+  if (!data.want_conversions) {
+    await logEvent(c.db, "google-ads", "ok", `gasto: ${stmts.length} linha(s)`, "");
+    return text(`ok ${stmts.length}`);
+  }
+  // Script v2: hand back the sales with a gclid that Google has not received yet; the script uploads them.
+  const since = new Date(Date.now() - 89 * 864e5).toISOString();
+  const pending = (await c.db.prepare(
+    `select v.id, v.at, v.amount_cents, v.currency, k.gclid from tk_conversions v join tk_clicks k on k.id = v.click_id
+     where k.gclid is not null and v.type in ('sale','upsell') and v.gads_sent_at is null and v.at >= ? order by v.at limit 500`,
+  ).bind(since).all()).results;
+  const conversions = pending.map((r) => ({
+    id: r.id, gclid: r.gclid,
+    time: new Date(Date.parse(r.at) - SP_OFFSET_H * 36e5).toISOString().replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2}).*$/, "$2/$3/$1 $4"),
+    value: (r.amount_cents / 100).toFixed(2), currency: r.currency,
+  }));
+  await logEvent(c.db, "google-ads", "ok", `script: gasto ${stmts.length} linha(s), ${conversions.length} venda(s) para enviar`, "");
+  return new Response(JSON.stringify({ ok: true, costs: stmts.length, conversion_name: s.gads_conv_name, conversions }), {
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+  });
+}
+
+/** Script v2 confirms which sales it uploaded. */
+export async function googleAck(c, key) {
+  const s = await checkKey(c, key);
+  if (!s) return text("chave inválida", 403);
+  let data;
+  try { data = JSON.parse(await c.req.text()); } catch { return text("JSON inválido", 400); }
+  const ids = (Array.isArray(data.ids) ? data.ids : []).map(String).filter((x) => /^[\w-]{6,40}$/.test(x)).slice(0, 500);
+  const ts = nowIso();
+  if (ids.length) await c.db.batch(ids.map((id) => c.db.prepare("update tk_conversions set gads_sent_at = ?, gads_error = null where id = ? and gads_sent_at is null").bind(ts, id)));
+  if (data.error) await logEvent(c.db, "google-ads", "falha", `script: ${String(data.error).slice(0, 300)}`, "");
+  else if (ids.length) await logEvent(c.db, "google-ads", "ok", `script: ${ids.length} venda(s) enviada(s) ao Google`, "");
+  return text(`ok ${ids.length}`);
 }
 
 function costUpsert(db, r, ts) {
@@ -604,7 +637,7 @@ export async function integrationsPost(c, action) {
     const nb = String(f.get("nb_postback") || "").trim();
     if (nb && !/^https:\/\/\S+$/.test(nb)) return trackingPage(c, { settingsError: "O postback da NewsBreak precisa começar com https://." }, 422);
     await setSetting(c.db, "nb_postback", nb.slice(0, 1000));
-    await setSetting(c.db, "gads_conv_name", String(f.get("gads_conv_name") || "Venda").trim().slice(0, 100) || "Venda");
+    await setSetting(c.db, "gads_conv_name", String(f.get("gads_conv_name") || "").trim().slice(0, 100) || "Cutti - Venda");
     c.flash("success", "Salvo.");
   } else if (action === "ntfy") {
     const s = await getSettings(c.db);

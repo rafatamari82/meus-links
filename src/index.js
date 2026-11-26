@@ -681,6 +681,8 @@ async function handle(req, env, exec) {
   if (m) return TR.postback(c, m[1], m[2] || "other");
   m = path.match(/^\/cost\/([\w-]+)\/google$/);
   if (m) return TR.googleCost(c, m[1]);
+  m = path.match(/^\/cost\/([\w-]+)\/google\/ack$/);
+  if (m) return TR.googleAck(c, m[1]);
   m = path.match(/^\/export\/([\w-]+)\/google\.csv$/);
   if (m) return TR.googleConversionsCsv(c, m[1]);
 

@@ -185,7 +185,7 @@ function copyBox(id, label, value, rows = 0) {
 </div>`;
 }
 
-export function trackingView(c, { s, base, linkDomain, costCount, settingsError, csvError, csvValue, costError, google }) {
+export function trackingView(c, { s, base, linkDomain, costCount, settingsError, csvError, csvValue, costError, google, gErrors }) {
   const pb = (net) => `${base}/pb/${s.key}/${net}`;
   const last = (src) => costCount.find((x) => x.source === src);
   const curOpt = (v, sel) => html`<option ${v === sel ? raw("selected") : ""}>${v}</option>`;
@@ -193,8 +193,6 @@ export function trackingView(c, { s, base, linkDomain, costCount, settingsError,
   const nbUrl = `https://${linkDomain}/SEU-LINK?src=newsbreak&cmp=__CAMPAIGN_NAME__&adg=__FLIGHT_NAME__&ad=__CREATIVE_NAME__&nbcb=__CALLBACK_PARAM__`;
   return page({ ...c, section: "tracking" }, "Trackeamento", html`
 <header class="page-head"><div><h1 class="h-xl">Trackeamento</h1><p class="muted">Como o clique do anúncio chega até a venda, e a venda volta para o anúncio.</p></div></header>
-
-${googleConnect(c, google)}
 
 <section class="card pad">
   <h2 class="h-lg">Como funciona</h2>
@@ -223,21 +221,30 @@ ${googleConnect(c, google)}
   </table>
 </section>
 
-<section class="card pad">
+<section class="card pad" id="google-ads">
   <h2 class="h-lg">Google Ads</h2>
-  ${copyBox("g-template", "Modelo de rastreamento (no nível da conta ou da campanha)", gTemplate)}
-  <p class="hint">Troque <code>SEU-LINK</code> pelo final do seu link rastreado. O URL final do anúncio continua sendo a sua página; o link precisa ter como destino a mesma página (mesmo domínio).</p>
-  ${copyBox("g-script", "Script do gasto (Ferramentas → Ações em massa → Scripts → novo script; programe a cada hora)", googleAdsScript(`${base}/cost/${s.key}/google`), 10)}
-  <p class="hint">${last("google") ? `Último gasto recebido: ${fmtDateTime(last("google").last)} (${last("google").n} linhas).` : "Ainda não recebi gasto do Google Ads."}</p>
-  ${copyBox("g-conv", "Conversões offline (Metas → Conversões → Importar → agendar por HTTPS)", `${base}/export/${s.key}/google.csv`)}
+  <p class="muted">Jeito fácil: um script só, colado uma vez. Ele traz o gasto e manda as vendas para o Google a cada hora. Sem Google Cloud e sem token.</p>
+  <ol class="steps">
+    <li><strong>Crie a conversão</strong> (uma vez): Metas → Conversões → <strong>+ Nova ação de conversão</strong> → Importar → Outras fontes de dados ou CRMs → Rastrear conversões de cliques. Nome: <strong>${s.gads_conv_name}</strong>, categoria Compra.</li>
+    <li><strong>Cole o script</strong>: Ferramentas → Ações em massa → <strong>Scripts</strong> → botão + → cole o código abaixo → <strong>Autorizar</strong> → Salvar → em Frequência, escolha <strong>A cada hora</strong>.</li>
+    <li><strong>Use o link rastreado</strong> no modelo de rastreamento da conta ou da campanha (logo abaixo).</li>
+  </ol>
+  ${copyBox("g-script", "Script do Cutti", googleAdsScript(`${base}/cost/${s.key}/google`), 10)}
+  <p class="hint">${s.gscript_at ? `Script rodou pela última vez em ${fmtDateTime(s.gscript_at)}.` : "O script ainda não rodou. Depois de colar, clique em Visualizar ou Executar para testar."} Se você já tinha colado o script antigo, troque pelo novo.</p>
   <form method="post" action="/integrations/tracking-settings" class="field-row" novalidate>
     ${csrfField(c)}<input type="hidden" name="back" value="/tracking">
-    <div class="field grow"><label for="gads_conv_name">Nome da ação de conversão no Google Ads</label><input id="gads_conv_name" name="gads_conv_name" maxlength="100" value="${s.gads_conv_name}"></div>
+    <div class="field grow"><label for="gads_conv_name">Nome da conversão no Google Ads</label><input id="gads_conv_name" name="gads_conv_name" maxlength="100" value="${s.gads_conv_name}"></div>
     <input type="hidden" name="nb_postback" value="${s.nb_postback}">
     <div class="field field-end"><button class="btn btn-secondary" type="submit">Salvar</button></div>
   </form>
-  <p class="hint">Crie no Google Ads uma ação de conversão de importação com esse nome. Assim o Google aprende com as vendas reais.</p>
+  <p class="hint">Tem que ser exatamente o mesmo nome da conversão criada no passo 1.</p>
+  ${copyBox("g-template", "Modelo de rastreamento (no nível da conta ou da campanha)", gTemplate)}
+  <p class="hint">Troque <code>SEU-LINK</code> pelo final do seu link rastreado. O URL final do anúncio continua sendo a sua página; o link precisa ter como destino a mesma página (mesmo domínio).</p>
 </section>
+
+${google ? html`<details class="card pad adv-box" ${gErrors ? raw("open") : ""}><summary class="h-lg">Avançado: conectar pela API do Google Ads</summary>
+  <p class="hint">Só se você quiser as vendas no Google na hora, em vez de a cada hora. Precisa de projeto no Google Cloud e token de desenvolvedor aprovado.</p>
+  ${google}</details>` : ""}
 
 <section class="card pad">
   <h2 class="h-lg">NewsBreak</h2>

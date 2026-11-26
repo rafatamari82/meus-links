@@ -466,7 +466,7 @@ class E2E(unittest.TestCase):
         p.locator("summary", has_text="Últimos avisos recebidos").click()
         expect(p.get_by_text(f"clique {cid}").first).to_be_visible()
         csv = p.request.get(f"{self.base}/export/{key}/google.csv").text()
-        self.assertIn('"GX","Venda"', csv)
+        self.assertIn('"GX","Cutti - Venda"', csv)
 
     def test_t02_newsbreak_csv_and_settings(self):
         p = self.page
@@ -618,6 +618,7 @@ class E2E(unittest.TestCase):
     def test_t10_connect_google_ads(self):
         p = self.page
         p.goto(self.base + "/tracking")
+        p.locator("summary", has_text="Avançado: conectar pela API").click()
         box = p.locator("#google")
         box.get_by_label("ID do cliente").fill("errado")
         box.get_by_role("button", name="Salvar dados").click()
@@ -627,7 +628,7 @@ class E2E(unittest.TestCase):
         box.get_by_label("Chave secreta do cliente").fill("GOCSPX-teste")
         box.get_by_label("Token de desenvolvedor").fill("dev-token-teste")
         box.get_by_role("button", name="Salvar dados").click()
-        expect(p.get_by_role("link", name="2. Conectar com Google")).to_be_visible()
+        expect(p.get_by_role("link", name="2. Conectar com Google")).to_be_attached()
         r = p.request.get(self.base + "/tracking/google/connect", max_redirects=0)
         self.assertEqual(r.status, 302)
         loc = r.headers["location"]
@@ -663,11 +664,43 @@ class E2E(unittest.TestCase):
         p.goto(self.base + "/results?p=today")
         expect(p.locator("tr", has_text="Campanha API")).to_be_visible()
         p.goto(self.base + "/tracking")
+        p.locator("summary", has_text="Avançado: conectar pela API").click()
         p.locator("#google").get_by_role("button", name="Sincronizar agora").click()
         expect(p.get_by_text("Sincronizado:")).to_be_visible()
         p.once("dialog", lambda d: d.accept())
         p.locator("#google").get_by_role("button", name="Desconectar").click()
         expect(p.get_by_text("Google Ads desconectado")).to_be_visible()
+
+    def test_t11_google_script_uploads_sales(self):
+        p = self.page
+        p.goto(self.base + "/links")
+        p.get_by_role("button", name="Novo link").first.click()
+        dlg = p.get_by_role("dialog")
+        dlg.get_by_label("Destino").fill("https://presell.exemplo.com/s")
+        dlg.get_by_label("Final do link").fill("g-script")
+        dlg.locator("summary", has_text="Rastrear vendas").click()
+        dlg.get_by_label("Gerar um código por clique").check()
+        dlg.get_by_label("Rede ou plataforma").select_option(label="ClickBank")
+        dlg.get_by_role("button", name="Criar link").click()
+        expect(p.locator("tr.is-new")).to_be_visible()
+        status, loc = self.hit(self.base + "/g-script?src=google&cmp=888&gclid=GCLIDSCRIPT")
+        cid = re.search(r"tid=(ct[a-z2-7]{10})", loc).group(1)
+        key = self.tracker_key()
+        self.assertEqual(p.request.get(f"{self.base}/pb/{key}/clickbank?cid={cid}&amount=42&txid=GS1").text(), "ok")
+        r = p.request.post(f"{self.base}/cost/{key}/google", data='{"currency":"USD","rows":[],"want_conversions":true}',
+                           headers={"Content-Type": "application/json"}).json()
+        mine = [x for x in r["conversions"] if x["gclid"] == "GCLIDSCRIPT"]
+        self.assertEqual(len(mine), 1)
+        self.assertEqual(mine[0]["value"], "42.00")
+        self.assertRegex(mine[0]["time"], r"^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$")
+        self.assertEqual(r["conversion_name"], "Cutti - Venda")
+        ack = p.request.post(f"{self.base}/cost/{key}/google/ack", data='{"ids":["%s"]}' % mine[0]["id"], headers={"Content-Type": "application/json"})
+        self.assertEqual(ack.text(), "ok 1")
+        r2 = p.request.post(f"{self.base}/cost/{key}/google", data='{"currency":"USD","rows":[],"want_conversions":true}',
+                            headers={"Content-Type": "application/json"}).json()
+        self.assertFalse([x for x in r2["conversions"] if x["gclid"] == "GCLIDSCRIPT"])
+        p.goto(self.base + "/tracking")
+        self.assertIn("want_conversions: true", p.get_by_label("Script do Cutti").input_value())
 
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
