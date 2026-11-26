@@ -1,14 +1,14 @@
 /* gerado de replica/design/tokens.json */
 :root {
   --color-bg: #ffffff;
-  --color-surface: #f4f4f5;
-  --color-border: #e4e4e7;
+  --color-surface: #f3f5f7;
+  --color-border: #e2e7ec;
   --color-border-input: #8a8a92;
   --color-text: #0a0a0a;
   --color-text-muted: #5b5b63;
-  --color-accent: #000000;
-  --color-accent-hover: #27272a;
-  --color-accent-soft: #ececee;
+  --color-accent: #17384c;
+  --color-accent-hover: #0f2938;
+  --color-accent-soft: #e5eef4;
   --color-on-accent: #ffffff;
   --color-danger: #b42828;
   --color-danger-soft: #fbe9e9;
