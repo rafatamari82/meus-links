@@ -304,3 +304,4 @@ a.set-row:hover { background: var(--color-surface); }
 .brand-logo { width: 28px; height: 28px; border-radius: 8px; display: block; }
 .tab-item.is-current { color: #0565e6; }
 .kpi-hero .kpi-label::after { content: ""; }
+@media (max-width: 760px) { .tabbar { grid-template-columns: repeat(5, 1fr); } .tab-item span { font-size: 11px; } }

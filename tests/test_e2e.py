@@ -418,7 +418,7 @@ class E2E(unittest.TestCase):
 
     # T: sales tracker
     def tracker_key(self):
-        self.page.goto(self.base + "/integrations")
+        self.page.goto(self.base + "/tracking")
         url = self.page.get_by_label("URL de postback BuyGoods").input_value()
         return re.search(r"/pb/([\w-]+)/", url).group(1)
 
@@ -470,7 +470,7 @@ class E2E(unittest.TestCase):
 
     def test_t02_newsbreak_csv_and_settings(self):
         p = self.page
-        p.goto(self.base + "/integrations")
+        p.goto(self.base + "/tracking")
         p.get_by_label("Importar gasto").fill("Date,Campaign Name,Spend\n2026-11-20,NB teste,10.00")
         p.get_by_role("button", name="Importar").click()
         expect(p.get_by_text("1 linha(s) de gasto da NewsBreak importadas")).to_be_visible()
@@ -572,6 +572,11 @@ class E2E(unittest.TestCase):
         expect(m.locator(".kpi-hero")).to_contain_text("Faturamento")
         bar.get_by_role("link", name="Vendas").click()
         expect(m.get_by_role("heading", name="Vendas", exact=True)).to_be_visible()
+        bar.get_by_role("link", name="Trackeamento").click()
+        expect(m.get_by_role("heading", name="Trackeamento", exact=True)).to_be_visible()
+        m.get_by_label("Postback da NewsBreak").fill("https://nb.exemplo.com/pb?c={clickid}&v={value}")
+        m.get_by_role("button", name="Salvar postback").click()
+        expect(m.get_by_label("Postback da NewsBreak")).to_have_value("https://nb.exemplo.com/pb?c={clickid}&v={value}")
         bar.get_by_role("link", name="Ajustes").click()
         expect(m.get_by_role("link", name="Domínios")).to_be_visible()
         m.context.close()
@@ -613,7 +618,7 @@ class E2E(unittest.TestCase):
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
                                      storage_state=self.ctx.storage_state()).new_page()
-        for path in ["/results", "/sales", "/integrations"]:
+        for path in ["/results", "/sales", "/integrations", "/tracking", "/settings"]:
             m.goto(self.base + path)
             width = m.evaluate("document.documentElement.scrollWidth")
             self.assertLessEqual(width, 390, f"{path} rola para o lado no celular")

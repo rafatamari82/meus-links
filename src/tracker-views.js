@@ -185,15 +185,16 @@ function copyBox(id, label, value, rows = 0) {
 </div>`;
 }
 
-export function integrationsView(c, { s, base, linkDomain, costCount, settingsError, csvError, csvValue, costError, tgError, devices = [] }) {
+export function trackingView(c, { s, base, linkDomain, costCount, settingsError, csvError, csvValue, costError, google }) {
   const pb = (net) => `${base}/pb/${s.key}/${net}`;
   const last = (src) => costCount.find((x) => x.source === src);
   const curOpt = (v, sel) => html`<option ${v === sel ? raw("selected") : ""}>${v}</option>`;
   const gTemplate = `https://${linkDomain}/SEU-LINK?src=google&cmp={campaignid}&adg={adgroupid}&ad={creative}&kw={keyword}&gclid={gclid}&lp={lpurl}`;
   const nbUrl = `https://${linkDomain}/SEU-LINK?src=newsbreak&cmp=__CAMPAIGN_NAME__&adg=__FLIGHT_NAME__&ad=__CREATIVE_NAME__&nbcb=__CALLBACK_PARAM__`;
-  return page({ ...c, section: "integrations" }, "Integrações", html`
-<header class="page-head"><div><h1 class="h-xl">Integrações</h1><p class="muted">Como o clique do anúncio chega até a venda.</p></div>
-  <a class="btn btn-secondary btn-sm" href="/domains">Domínios</a></header>
+  return page({ ...c, section: "tracking" }, "Trackeamento", html`
+<header class="page-head"><div><h1 class="h-xl">Trackeamento</h1><p class="muted">Como o clique do anúncio chega até a venda, e a venda volta para o anúncio.</p></div></header>
+
+${googleConnect(c, google)}
 
 <section class="card pad">
   <h2 class="h-lg">Como funciona</h2>
@@ -204,8 +205,6 @@ export function integrationsView(c, { s, base, linkDomain, costCount, settingsEr
   </ol>
   <p class="hint">Se você usa presell, cole este script na presell. Ele passa o código para os links da oferta: <code>&lt;script src="${base}/t.js" data-param="tid" defer&gt;&lt;/script&gt;</code>. Troque <code>tid</code> pelo parâmetro da rede, ou coloque <code>data-param</code> em cada link.</p>
 </section>
-
-${notifySection(c, s, tgError, devices)}
 
 <section class="card table-wrap">
   <div class="pad"><h2 class="h-lg">Redes e plataformas</h2>
@@ -231,7 +230,13 @@ ${notifySection(c, s, tgError, devices)}
   ${copyBox("g-script", "Script do gasto (Ferramentas → Ações em massa → Scripts → novo script; programe a cada hora)", googleAdsScript(`${base}/cost/${s.key}/google`), 10)}
   <p class="hint">${last("google") ? `Último gasto recebido: ${fmtDateTime(last("google").last)} (${last("google").n} linhas).` : "Ainda não recebi gasto do Google Ads."}</p>
   ${copyBox("g-conv", "Conversões offline (Metas → Conversões → Importar → agendar por HTTPS)", `${base}/export/${s.key}/google.csv`)}
-  <p class="hint">Crie no Google Ads uma ação de conversão de importação com o nome “${s.gads_conv_name}”. Assim o Google aprende com as vendas reais.</p>
+  <form method="post" action="/integrations/tracking-settings" class="field-row" novalidate>
+    ${csrfField(c)}<input type="hidden" name="back" value="/tracking">
+    <div class="field grow"><label for="gads_conv_name">Nome da ação de conversão no Google Ads</label><input id="gads_conv_name" name="gads_conv_name" maxlength="100" value="${s.gads_conv_name}"></div>
+    <input type="hidden" name="nb_postback" value="${s.nb_postback}">
+    <div class="field field-end"><button class="btn btn-secondary" type="submit">Salvar</button></div>
+  </form>
+  <p class="hint">Crie no Google Ads uma ação de conversão de importação com esse nome. Assim o Google aprende com as vendas reais.</p>
 </section>
 
 <section class="card pad">
@@ -239,7 +244,7 @@ ${notifySection(c, s, tgError, devices)}
   ${copyBox("nb-url", "URL do anúncio (Landing page URL)", nbUrl)}
   <p class="hint">Troque <code>SEU-LINK</code> pelo final do seu link rastreado.</p>
   <form method="post" action="/integrations/newsbreak-csv" class="stack" novalidate>
-    ${csrfField(c)}
+    ${csrfField(c)}<input type="hidden" name="back" value="/tracking">
     <div class="field">
       <label for="csv">Importar gasto (CSV do relatório da NewsBreak, por dia e por campanha)</label>
       <textarea id="csv" name="csv" rows="6" spellcheck="false" placeholder="Date,Campaign Name,Spend&#10;2026-11-24,Oferta X - US,35.20" ${csvError ? raw('aria-invalid="true" aria-describedby="csv-err"') : ""}>${csvValue || ""}</textarea>
@@ -251,12 +256,23 @@ ${notifySection(c, s, tgError, devices)}
       <div class="field field-end"><button class="btn btn-primary" type="submit">Importar</button></div>
     </div>
   </form>
+  <form method="post" action="/integrations/tracking-settings" class="stack" novalidate>
+    ${csrfField(c)}<input type="hidden" name="back" value="/tracking">
+    <input type="hidden" name="gads_conv_name" value="${s.gads_conv_name}">
+    <div class="field">
+      <label for="nb_postback">Postback da NewsBreak (a NewsBreak aprende com cada venda)</label>
+      <input id="nb_postback" name="nb_postback" type="url" maxlength="1000" value="${s.nb_postback}" placeholder="https://…{clickid}…{value}" ${settingsError ? raw('aria-invalid="true" aria-describedby="nb-err"') : ""}>
+      ${fieldError("nb-err", settingsError)}
+      <p class="hint">Cole a URL que a NewsBreak dá em Event management e troque o lugar do click ID por <code>{clickid}</code> e o do valor por <code>{value}</code> (em dólar).</p>
+    </div>
+    <div class="row-end"><button class="btn btn-secondary" type="submit">Salvar postback</button></div>
+  </form>
 </section>
 
 <section class="card pad">
   <h2 class="h-lg">Lançar gasto à mão</h2>
   <form method="post" action="/integrations/cost" class="field-row" novalidate>
-    ${csrfField(c)}
+    ${csrfField(c)}<input type="hidden" name="back" value="/tracking">
     <div class="field"><label for="c-date">Data</label><input id="c-date" name="date" type="date" required></div>
     <div class="field"><label for="c-src">Origem</label><select id="c-src" name="source"><option value="newsbreak">NewsBreak</option><option value="google">Google Ads</option><option value="other">Outros</option></select></div>
     <div class="field grow"><label for="c-camp">Campanha</label><input id="c-camp" name="campaign" maxlength="200" placeholder="Nome na NewsBreak, ou ID no Google"></div>
@@ -266,6 +282,23 @@ ${notifySection(c, s, tgError, devices)}
   </form>
   ${fieldError("cost-err", costError)}
 </section>
+
+<section class="card pad narrow">
+  <h2 class="h-lg">Chave secreta</h2>
+  <p class="muted">Ela está em todas as URLs acima. Troque se alguém de fora a viu; depois atualize as redes e o script.</p>
+  <form method="post" action="/integrations/key" data-confirm="Trocar a chave? As URLs antigas param de funcionar na hora.">
+    ${csrfField(c)}<input type="hidden" name="back" value="/tracking"><button class="btn btn-ghost danger-text" type="submit">Trocar chave</button>
+  </form>
+</section>`);
+}
+
+export function integrationsView(c, { s, settingsError, tgError, devices = [] }) {
+  const curOpt = (v, sel) => html`<option ${v === sel ? raw("selected") : ""}>${v}</option>`;
+  return page({ ...c, section: "integrations" }, "Avisos e moeda", html`
+<header class="page-head"><div><h1 class="h-xl">Avisos e moeda</h1><p class="muted">Notificações de venda e câmbio.</p></div>
+  <a class="btn btn-secondary btn-sm" href="/tracking">Trackeamento</a></header>
+
+${notifySection(c, s, tgError, devices)}
 
 <section class="card pad narrow">
   <h2 class="h-lg">Moeda e câmbio</h2>
@@ -279,21 +312,7 @@ ${notifySection(c, s, tgError, devices)}
       <div class="field"><label for="usd_brl">1 dólar = R$</label><input id="usd_brl" name="usd_brl" inputmode="decimal" value="${String(s.usd_brl).replace(".", ",")}"></div>
       <div class="field"><label for="eur_brl">1 euro = R$</label><input id="eur_brl" name="eur_brl" inputmode="decimal" value="${String(s.eur_brl).replace(".", ",")}"></div>
     </div>
-    <div class="field"><label for="gads_conv_name">Nome da conversão no Google Ads</label><input id="gads_conv_name" name="gads_conv_name" maxlength="100" value="${s.gads_conv_name}"></div>
-    <div class="field">
-      <label for="nb_postback">Postback da NewsBreak <span class="muted">(opcional)</span></label>
-      <input id="nb_postback" name="nb_postback" type="url" maxlength="1000" value="${s.nb_postback}" placeholder="https://…{clickid}…{value}">
-      <p class="hint">Cole a URL que a NewsBreak dá em Event management e troque o lugar do click ID por <code>{clickid}</code> e o do valor por <code>{value}</code> (em dólar). Cada venda vinda da NewsBreak é avisada a ela.</p>
-    </div>
     <div class="row-end"><button class="btn btn-primary" type="submit">Salvar</button></div>
-  </form>
-</section>
-
-<section class="card pad narrow">
-  <h2 class="h-lg">Chave secreta</h2>
-  <p class="muted">Ela está em todas as URLs acima. Troque se alguém de fora a viu; depois atualize as redes e o script.</p>
-  <form method="post" action="/integrations/key" data-confirm="Trocar a chave? As URLs antigas param de funcionar na hora.">
-    ${csrfField(c)}<button class="btn btn-ghost danger-text" type="submit">Trocar chave</button>
   </form>
 </section>`);
 }
@@ -421,4 +440,9 @@ function templateEditor(c, s) {
     </div>
   </form>
 </details>`;
+}
+
+function googleConnect(c, g) {
+  if (!g) return "";
+  return g;
 }

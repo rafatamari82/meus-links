@@ -64,7 +64,8 @@ function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
 
 <h2 class="set-title">Mais</h2>
 <div class="set-group">
-  <a class="set-row" href="/integrations"><span class="set-label">Integrações e postbacks<span class="hint">Melhor no computador</span></span>${chev}</a>
+  <a class="set-row" href="/tracking"><span class="set-label">Trackeamento<span class="hint">Postbacks, Google Ads, NewsBreak · melhor no computador</span></span>${chev}</a>
+  <a class="set-row" href="/integrations"><span class="set-label">Avisos e moeda<span class="hint">ntfy, Telegram, texto do aviso, câmbio</span></span>${chev}</a>
   <a class="set-row" href="/domains"><span class="set-label">Domínios</span>${chev}</a>
   <form method="post" action="/logout" class="set-row">${csrfField(c)}<button class="set-link danger-text" type="submit">Sair</button></form>
 </div>`);

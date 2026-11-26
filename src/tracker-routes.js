@@ -567,12 +567,18 @@ export async function salesPage(c) {
 
 export async function integrationsPage(c, extra = {}, status = 200) {
   const s = await getSettings(c.db);
+  const devices = (await c.db.prepare("select id, label, created_at, last_ok_at from push_subs order by created_at").all()).results;
+  return c.respond(TV.integrationsView(c.view(), { s, devices, ...extra }), status);
+}
+
+export async function trackingPage(c, extra = {}, status = 200) {
+  const s = await getSettings(c.db);
   const d = await c.db.prepare("select full_name from domains where user_id = ? and active = 1 order by is_default desc, type asc limit 1")
     .bind(c.user.id).first();
   const costCount = (await c.db.prepare("select source, count(*) as n, max(updated_at) as last from tk_costs group by source").all()).results;
-  const devices = (await c.db.prepare("select id, label, created_at, last_ok_at from push_subs order by created_at").all()).results;
-  return c.respond(TV.integrationsView(c.view(), {
-    s, base: `https://${c.panelHost()}`, linkDomain: d?.full_name || c.panelHost(), costCount, devices, ...extra,
+  const google = c.googleBox ? await c.googleBox(c, s) : "";
+  return c.respond(TV.trackingView(c.view(), {
+    s, base: `https://${c.panelHost()}`, linkDomain: d?.full_name || c.panelHost(), costCount, google, ...extra,
   }), status);
 }
 
@@ -588,11 +594,13 @@ export async function integrationsPost(c, action) {
     if (f.get("rate_auto")) await setSetting(c.db, "rate_at", "");
     await setSetting(c.db, "usd_brl", usd);
     await setSetting(c.db, "eur_brl", eur);
-    await setSetting(c.db, "gads_conv_name", String(f.get("gads_conv_name") || "Venda").trim().slice(0, 100) || "Venda");
-    const nb = String(f.get("nb_postback") || "").trim();
-    if (nb && !/^https:\/\/\S+$/.test(nb)) return integrationsPage(c, { settingsError: "O postback da NewsBreak precisa começar com https://." }, 422);
-    await setSetting(c.db, "nb_postback", nb.slice(0, 1000));
     c.flash("success", "Configurações salvas.");
+  } else if (action === "tracking-settings") {
+    const nb = String(f.get("nb_postback") || "").trim();
+    if (nb && !/^https:\/\/\S+$/.test(nb)) return trackingPage(c, { settingsError: "O postback da NewsBreak precisa começar com https://." }, 422);
+    await setSetting(c.db, "nb_postback", nb.slice(0, 1000));
+    await setSetting(c.db, "gads_conv_name", String(f.get("gads_conv_name") || "Venda").trim().slice(0, 100) || "Venda");
+    c.flash("success", "Salvo.");
   } else if (action === "ntfy") {
     const s = await getSettings(c.db);
     if (f.get("off")) {
@@ -658,7 +666,7 @@ export async function integrationsPost(c, action) {
     const csv = String(f.get("csv") || "");
     const currency = T.CURRENCIES.includes(String(f.get("currency"))) ? String(f.get("currency")) : "USD";
     const r = T.parseCostCsv(csv);
-    if (r.error) return integrationsPage(c, { csvError: r.error, csvValue: csv.slice(0, 20000) }, 422);
+    if (r.error) return trackingPage(c, { csvError: r.error, csvValue: csv.slice(0, 20000) }, 422);
     const ts = nowIso();
     const stmts = r.rows.map((x) => costUpsert(c.db, { ...x, source: "newsbreak", currency }, ts));
     for (let i = 0; i < stmts.length; i += 50) await c.db.batch(stmts.slice(i, i + 50));
@@ -670,12 +678,12 @@ export async function integrationsPost(c, action) {
     const cents = T.toCents(f.get("amount"));
     const currency = T.CURRENCIES.includes(String(f.get("currency"))) ? String(f.get("currency")) : "BRL";
     if (!date || !name || cents == null) {
-      return integrationsPage(c, { costError: "Preencha data, campanha e valor." }, 422);
+      return trackingPage(c, { costError: "Preencha data, campanha e valor." }, 422);
     }
     await costUpsert(c.db, { date, source, campaign_key: name, campaign_name: name, cost_cents: cents, currency }, nowIso()).run();
     c.flash("success", "Gasto salvo.");
   }
-  return c.redirect(f.get("back") === "/settings" ? "/settings" : "/integrations");
+  return c.redirect(["/settings", "/tracking"].includes(f.get("back")) ? f.get("back") : "/integrations");
 }
 
 export async function deleteSale(c, id) {
