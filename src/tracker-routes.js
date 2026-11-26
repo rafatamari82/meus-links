@@ -3,6 +3,9 @@ import * as T from "./tracker.js";
 import { newId, randomToken, safeEqual } from "./security.js";
 import { newVapidKeys, sendPush } from "./webpush.js";
 import * as GA from "./googleads.js";
+import { countryName } from "./core.js";
+
+const flag = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((ch) => 127397 + ch.charCodeAt(0))) : "");
 import * as TV from "./tracker-views.js";
 
 const nowIso = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -225,6 +228,7 @@ async function saleMessage(db, s, network, p, click) {
     origem: click ? (T.SOURCES[click.source] || click.source) : "sem clique rastreado",
     campanha, anuncio: click?.ad || "", palavra: click?.keyword || "", pedido: p.txid || "", produto: p.product || "",
     hoje: String(hoje), total_hoje: T.fmtMoney(total, s.currency),
+    pais: /^[A-Z]{2}$/.test(click?.country || "") && !["XX", "T1"].includes(click.country) ? `${flag(click.country)} ${countryName(click.country)}` : "",
   };
   return messageFrom(s, vars, refund);
 }
@@ -281,7 +285,7 @@ const escHtml = (x) => String(x ?? "").replace(/[&<>"']/g, (ch) => `&#${ch.charC
 export function saleEmail(m, panel) {
   const v = m.vars || {};
   const rows = [
-    ["Produto", v.produto], ["Valor", v.valor], ["Em reais", v.valor_painel], ["Rede", v.rede], ["Origem", v.origem],
+    ["Produto", v.produto], ["Valor", v.valor], ["Em reais", v.valor_painel], ["Rede", v.rede], ["País", v.pais], ["Origem", v.origem],
     ["Campanha", v.campanha], ["Anúncio", v.anuncio], ["Pedido", v.pedido], ["Vendas hoje", v.hoje], ["Faturamento hoje", v.total_hoje],
   ].filter(([, x]) => x);
   const text = `${m.title}\n${m.body}\n\n${rows.map(([k, x]) => `${k}: ${x}`).join("\n")}\n\nVer no Cutti: ${panel}/sales`;
@@ -596,7 +600,7 @@ export async function salesPage(c) {
   const range = readRange(c.url.searchParams);
   const network = T.NETWORKS[c.url.searchParams.get("network")] ? c.url.searchParams.get("network") : "";
   const sales = (await c.db.prepare(
-    `select v.*, k.source, k.campaign, k.ad, k.keyword from tk_conversions v left join tk_clicks k on k.id = v.click_id
+    `select v.*, k.source, k.campaign, k.ad, k.keyword, k.country from tk_conversions v left join tk_clicks k on k.id = v.click_id
      where v.at >= ? and v.at < ?${network ? " and v.network = ?" : ""} order by v.at desc limit 300`,
   ).bind(range.start, range.end, ...(network ? [network] : [])).all()).results;
   const events = (await c.db.prepare("select * from tk_events order by id desc limit 40").all()).results;

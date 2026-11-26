@@ -374,7 +374,7 @@ export const PRESELL_JS = `(function(){
 
 export const TEMPLATE_DEFAULTS = {
   sale_title: "{emoji} {tipo}! {valor}",
-  sale_body: "{produto} · {rede} · {origem} · {campanha}",
+  sale_body: "{produto} · {pais} · {rede} · {origem} · {campanha}",
   refund_title: "{emoji} {tipo} {valor}",
   refund_body: "{produto} · {rede} · pedido {pedido}",
 };
@@ -391,13 +391,14 @@ export const TEMPLATE_VARS = {
   palavra: "palavra-chave do Google",
   pedido: "número do pedido",
   produto: "nome do produto (ou da oferta) vendido",
+  pais: "país de quem comprou (🇺🇸 Estados Unidos)",
   hoje: "vendas de hoje até agora (contando esta)",
   total_hoje: "faturamento de hoje no painel",
 };
 
 export const SAMPLE_VARS = {
   emoji: "💰", tipo: "Venda", valor: "US$ 87,50", valor_painel: "R$ 472,50", rede: "ClickBank", origem: "Google Ads",
-  campanha: "Campanha exemplo", anuncio: "Anúncio 3", produto: "SodaPeak", palavra: "receita de bolo", pedido: "ABC123", hoje: "4", total_hoje: "R$ 1.890,00",
+  campanha: "Campanha exemplo", anuncio: "Anúncio 3", produto: "SodaPeak", pais: "🇺🇸 Estados Unidos", palavra: "receita de bolo", pedido: "ABC123", hoje: "4", total_hoje: "R$ 1.890,00",
 };
 
 export function cleanTemplate(raw, fallback) {

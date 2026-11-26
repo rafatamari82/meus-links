@@ -436,7 +436,9 @@ class E2E(unittest.TestCase):
         dlg.get_by_role("button", name="Criar link").click()
         expect(p.locator("tr.is-new")).to_contain_text("Rastreado · ClickBank")
 
-        status, loc = self.hit(self.base + "/bolo-g?src=google&cmp=9001&ad=77&gclid=GX&lp=https%3A%2F%2Fpresell.exemplo.com%2Fbolo%3Fv%3D2")
+        r0 = p.request.get(self.base + "/bolo-g?src=google&cmp=9001&ad=77&gclid=GX&lp=https%3A%2F%2Fpresell.exemplo.com%2Fbolo%3Fv%3D2",
+                           max_redirects=0, headers={"User-Agent": HUMAN_UA, "CF-IPCountry": "US"})
+        status, loc = r0.status, r0.headers.get("location")
         self.assertEqual(status, 302)
         cid = re.search(r"tid=(ct[a-z2-7]{10})", loc).group(1)
         self.assertTrue(loc.startswith("https://presell.exemplo.com/bolo?v=2"), loc)
@@ -463,6 +465,7 @@ class E2E(unittest.TestCase):
         sale_row = p.locator("tr", has=p.locator("td[data-label=Tipo]")).filter(has_text="pedido CB1")
         expect(sale_row).to_contain_text("Venda")
         expect(sale_row.locator("td[data-label=Produto]")).to_have_text("HoneyBoost")
+        expect(sale_row.locator("td[data-label=País]")).to_contain_text("Estados Unidos")
         p.locator("summary", has_text="Últimos avisos recebidos").click()
         expect(p.get_by_text(f"clique {cid}").first).to_be_visible()
         csv = p.request.get(f"{self.base}/export/{key}/google.csv").text()

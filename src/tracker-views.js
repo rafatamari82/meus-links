@@ -1,5 +1,9 @@
 // Tracker screens: Resultados, Vendas, Integrações.
 import { csrfField, fieldError, fmtDateTime, html, page, raw } from "./views.js";
+import { countryName } from "./core.js";
+
+const flag = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((ch) => 127397 + ch.charCodeAt(0))) : "");
+const place = (cc) => (cc && cc !== "XX" ? `${flag(cc)} ${countryName(cc)}` : "");
 import { fmtMoney, googleAdsScript, NETWORKS, renderTemplate, SAMPLE_VARS, SOURCES, TEMPLATE_VARS } from "./tracker.js";
 
 const SOURCE_LABEL = { ...SOURCES, none: "Sem rastreio" };
@@ -139,7 +143,7 @@ ${sales.length ? html`<ul class="sale-list" aria-label="Vendas">${sales.map((v) 
   return html`<li class="sale-item">
     <div class="sale-main">
       <strong>${v.product || NETWORKS[v.network]?.name || v.network}</strong>
-      <span class="hint">${fmtDateTime(v.at)} · ${NETWORKS[v.network]?.name || v.network}${v.click_id ? ` · ${SOURCE_LABEL[v.source] || v.source}${v.campaign ? ` · ${v.campaign}` : ""}` : ""}</span>
+      <span class="hint">${fmtDateTime(v.at)} · ${NETWORKS[v.network]?.name || v.network}${place(v.country) ? ` · ${place(v.country)}` : ""}${v.click_id ? ` · ${SOURCE_LABEL[v.source] || v.source}${v.campaign ? ` · ${v.campaign}` : ""}` : ""}</span>
     </div>
     <div class="sale-side">
       <span class="sale-amount ${neg ? "neg" : ""}">${neg ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}</span>
@@ -150,13 +154,14 @@ ${sales.length ? html`<ul class="sale-list" aria-label="Vendas">${sales.map((v) 
 <section class="card table-wrap sales-table-wrap">
   ${sales.length ? html`
   <table class="links-table">
-    <thead><tr><th scope="col">Quando</th><th scope="col">Tipo</th><th scope="col">Produto</th><th scope="col">Rede</th><th scope="col">Origem</th><th scope="col" class="num">Valor</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+    <thead><tr><th scope="col">Quando</th><th scope="col">Tipo</th><th scope="col">Produto</th><th scope="col">Rede</th><th scope="col">País</th><th scope="col">Origem</th><th scope="col" class="num">Valor</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
     <tbody>${sales.map((v) => html`
       <tr>
         <td data-label="Quando" class="nowrap">${fmtDateTime(v.at)}</td>
         <td data-label="Tipo"><span class="badge ${v.type === "sale" || v.type === "upsell" ? "badge-success" : "badge-warning"}">${TYPE_LABEL[v.type]}</span></td>
         <td data-label="Produto">${v.product ? html`<strong>${v.product}</strong>` : html`<span class="muted">—</span>`}</td>
         <td data-label="Rede">${NETWORKS[v.network]?.name || v.network}<div class="hint">pedido ${v.txid}</div></td>
+        <td data-label="País">${place(v.country) || html`<span class="muted">—</span>`}</td>
         <td data-label="Origem">${v.click_id ? html`${SOURCE_LABEL[v.source] || v.source}<div class="hint">${[v.campaign, v.ad, v.keyword].filter(Boolean).join(" · ") || "sem campanha"}</div>` : html`<span class="muted">Sem clique rastreado</span>`}</td>
         <td data-label="Valor" class="num">${v.type === "refund" || v.type === "chargeback" ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}</td>
         <td class="actions-cell"><div class="actions"><form method="post" action="/sales/${v.id}/delete" data-confirm="Remover este registro? Ele sai dos resultados.">${csrfField(c)}<button class="btn btn-ghost btn-xs danger-text" type="submit">Remover</button></form></div></td>
