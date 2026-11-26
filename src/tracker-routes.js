@@ -39,30 +39,41 @@ export async function getSettings(db) {
     notify_muted: (s.notify_muted || "").split(",").filter(Boolean),
     rate_auto: s.rate_auto !== "0",
     rate_at: s.rate_at || "",
+    rate_src: s.rate_src || "",
     templates: Object.fromEntries(Object.entries(T.TEMPLATE_DEFAULTS).map(([k, d]) => [k, s[`tpl_${k}`] || d])),
   };
 }
 
-/** Today's dollar and euro in reais, from AwesomeAPI (free, no key). Refreshed at most every 3 hours. */
+// Quote sources, tried in order. Each returns { usd, eur } in reais, or throws.
+const RATE_SOURCES = [
+  ["AwesomeAPI", "https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL", (j) => ({ usd: Number(j?.USDBRL?.bid), eur: Number(j?.EURBRL?.bid) })],
+  ["ExchangeRate-API", "https://open.er-api.com/v6/latest/USD", (j) => ({ usd: Number(j?.rates?.BRL), eur: Number(j?.rates?.BRL) / Number(j?.rates?.EUR) })],
+  ["Frankfurter", "https://api.frankfurter.dev/v1/latest?base=USD&symbols=BRL,EUR", (j) => ({ usd: Number(j?.rates?.BRL), eur: Number(j?.rates?.BRL) / Number(j?.rates?.EUR) })],
+];
+const okRate = (x) => x > 1 && x < 50;
+
+/** Today's dollar and euro in reais, from free quote services (no key). Refreshed at most every hour. */
 let ratesFailedAt = 0;
-export async function freshRates(c, s) {
+export async function freshRates(c, s, { force = false } = {}) {
   if (!s.rate_auto) return s;
-  if (Date.now() - ratesFailedAt < 10 * 60e3) return s; // the quote service was down a moment ago
-  if (s.rate_at && Date.now() - Date.parse(s.rate_at) < 3 * 36e5) return s;
-  try {
-    const r = await (c.env.__ratesFetch || fetch)("https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL", { signal: AbortSignal.timeout(2500) });
-    const j = await r.json();
-    const usd = Number(j?.USDBRL?.bid);
-    const eur = Number(j?.EURBRL?.bid);
-    if (usd > 1 && usd < 50 && eur > 1 && eur < 50) {
+  if (!force && Date.now() - ratesFailedAt < 10 * 60e3) return s; // all sources were down a moment ago
+  if (!force && s.rate_at && Date.now() - Date.parse(s.rate_at) < 36e5) return s;
+  const fetcher = c.env.__ratesFetch || fetch;
+  for (const [name, url, read] of RATE_SOURCES) {
+    try {
+      const r = await fetcher(url, { headers: { "User-Agent": "cutti.us (cotacao)", Accept: "application/json" }, signal: AbortSignal.timeout(2500) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const { usd, eur } = read(await r.json());
+      if (!okRate(usd) || !okRate(eur)) throw new Error("valor fora do esperado");
       const at = new Date().toISOString();
-      await setSetting(c.db, "usd_brl", usd);
-      await setSetting(c.db, "eur_brl", eur);
+      await setSetting(c.db, "usd_brl", usd.toFixed(4));
+      await setSetting(c.db, "eur_brl", eur.toFixed(4));
       await setSetting(c.db, "rate_at", at);
-      return { ...s, usd_brl: usd, eur_brl: eur, rate_at: at };
+      await setSetting(c.db, "rate_src", name);
+      return { ...s, usd_brl: usd, eur_brl: eur, rate_at: at, rate_src: name };
+    } catch (e) {
+      console.error("cotação", name, e?.message || e);
     }
-  } catch (e) {
-    console.error("cotação", e?.name || e);
   }
   ratesFailedAt = Date.now();
   return s;

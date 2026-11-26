@@ -1,7 +1,7 @@
 // Ajustes: the phone settings screen. Short on purpose; the full setup stays in Integrações (desktop).
 import { csrfField, fieldError, fmtDateTime, html, page, raw } from "./views.js";
 import { checkPassword, hashPassword } from "./security.js";
-import { fmtMoney, NETWORKS } from "./tracker.js";
+import { NETWORKS } from "./tracker.js";
 import { freshRates, getSettings, setSetting } from "./tracker-routes.js";
 
 const chev = raw('<svg class="row-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>');
@@ -40,9 +40,11 @@ function settingsView(c, { s, nets, devices, email }) {
       <button type="submit" name="currency" value="USD" class="${s.currency === "USD" ? "is-on" : ""}" aria-pressed="${s.currency === "USD"}">Dólar</button>
     </span>
   </form>
-  <div class="set-row"><span class="set-label">Dólar hoje</span><span class="set-value">${fmtMoney(Math.round(s.usd_brl * 100), "BRL")}</span></div>
+  <div class="set-row"><span class="set-label">Dólar hoje<span class="hint">${s.rate_auto ? (s.rate_at ? `comercial · ${fmtDateTime(s.rate_at)}` : "ainda não atualizado") : "digitado à mão"}</span></span>
+    <span class="set-value">R$ ${s.usd_brl.toFixed(4).replace(".", ",")}</span></div>
+  ${s.rate_auto ? html`<form method="post" action="/settings/rate" class="set-row">${csrfField(c)}<button class="set-link" type="submit">Atualizar cotação agora</button></form>` : ""}
 </div>
-<p class="set-note">${s.rate_auto ? `Cotação automática${s.rate_at ? `, atualizada em ${fmtDateTime(s.rate_at)}` : ""}. Vendas em dólar e gasto em real são convertidos por ela.` : "Cotação digitada à mão, em Integrações."}</p>
+<p class="set-note">Dólar comercial do momento${s.rate_src ? ` (fonte: ${s.rate_src})` : ""}, atualizado a cada hora. Apps de banco e de câmbio podem mostrar um pouco acima, porque somam a margem deles.</p>
 
 <h2 class="set-title">Notificações de venda</h2>
 <div class="set-group">
@@ -73,6 +75,11 @@ export async function settingsPost(c, action) {
     const cur = String(f.get("currency")) === "USD" ? "USD" : "BRL";
     await setSetting(c.db, "currency", cur);
     c.flash("success", cur === "USD" ? "Valores em dólar." : "Valores em real.");
+  } else if (action === "rate") {
+    const before = await getSettings(c.db);
+    const after = await freshRates(c, before, { force: true });
+    if (after.rate_at && after.rate_at !== before.rate_at) c.flash("success", `Dólar atualizado: R$ ${after.usd_brl.toFixed(4).replace(".", ",")}.`);
+    else c.flash("error", "Não consegui buscar a cotação agora. Tente de novo em alguns minutos.");
   } else if (action === "refunds") {
     await setSetting(c.db, "notify_refunds", f.get("on") ? "1" : "0");
   } else if (action === "mute") {
