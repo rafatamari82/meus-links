@@ -416,11 +416,14 @@ export function pagesView(c, { rows }) {
 </header>
 <div class="template-grid">
   ${Object.entries(TEMPLATES).map(([key, t]) => html`
-  <a class="card pad template-card" href="/pages/new?template=${key}">
+  <div class="card pad template-card">
     <span class="h-lg">${t.label}</span>
     <span class="muted">${t.hint}</span>
-    <span class="btn btn-secondary btn-sm">Criar ${t.label}</span>
-  </a>`)}
+    <div class="row">
+      <a class="btn btn-primary btn-sm" href="/pages/ai?template=${key}">✨ Criar ${t.label} com IA</a>
+      <a class="btn btn-ghost btn-sm" href="/pages/new?template=${key}">Criar ${t.label} sem IA</a>
+    </div>
+  </div>`)}
 </div>
 ${rows.length ? html`
 <div class="card table-wrap">
@@ -496,10 +499,11 @@ export function pageEditorView(c, { template, link, values, errors, activeDomain
   <h1 class="h-xl">${isNew ? `Nova página ${t.label}` : `Editar página ${t.label}`}</h1>
   ${!isNew ? html`<a class="btn btn-secondary" href="${c.scheme}://${link.domain_name}/${link.slashtag}" target="_blank" rel="noopener">Ver página</a>` : ""}
 </header>
-<form method="post" class="card pad narrow stack" novalidate>
+<form method="post" action="${isNew ? "/pages/new" : `/pages/${link.id}/edit`}" class="card pad narrow stack" novalidate>
   ${csrfField(c)}
   <input type="hidden" name="template" value="${template}">
   ${e.form ? html`<p class="alert alert-error" role="alert">${e.form}</p>` : ""}
+  ${c.aiNotice ? html`<p class="alert alert-info" role="status">✨ Texto escrito pela IA a partir das informações que você deu. Leia, ajuste o que quiser e clique em <strong>Publicar página</strong>.${c.aiNotice !== true ? html` ${c.aiNotice}` : ""}</p>` : ""}
   <h2 class="h-lg">Endereço e botão</h2>
   <div class="field-row">
     <div class="field">
@@ -544,6 +548,36 @@ export function pageEditorView(c, { template, link, values, errors, activeDomain
   <div class="row-end">
     <a class="btn btn-ghost" href="/pages">Cancelar</a>
     <button class="btn btn-primary" type="submit">${isNew ? "Publicar página" : "Salvar"}</button>
+  </div>
+</form>`);
+}
+
+export function aiFormView(c, { template, values, errors }) {
+  const v = values || {};
+  const e = errors || {};
+  const t = TEMPLATES[template];
+  return page({ ...c, section: "pages" }, `${t.label} com IA`, html`
+<nav class="crumbs"><a href="/pages">Páginas</a> <span aria-hidden="true">/</span> <span>${t.label} com IA</span></nav>
+<header class="page-head"><div><h1 class="h-xl">Criar ${t.label} com IA</h1>
+<p class="muted">Preencha o básico. A IA escreve a página inteira e você revisa antes de publicar.</p></div></header>
+<form method="post" class="card pad narrow stack" novalidate data-ai-form>
+  ${csrfField(c)}
+  <input type="hidden" name="template" value="${template}">
+  ${e.form ? html`<p class="alert alert-error" role="alert">${e.form}</p>` : ""}
+  ${textField("product_name", "Nome do produto", v, e, { max: 100, required: true, placeholder: "Ex.: SodaPeak" })}
+  <div class="field">
+    <label for="destination">Seu link de afiliado</label>
+    <input id="destination" name="destination" type="url" maxlength="2048" required placeholder="https://…" value="${v.destination}" ${invalid("destination-err", e.destination)}>
+    ${fieldError("destination-err", e.destination)}
+  </div>
+  ${textField("product_url", "Página oficial do produto (recomendado)", v, e, { max: 2048, placeholder: "https://site-oficial-do-produto.com", hint: "A IA lê essa página para usar só informações reais do produto. Sem ela, o texto fica mais genérico." })}
+  ${textField("notes", "Observações (opcional)", v, e, { rows: 4, max: 3000, placeholder: "Ex.: público mulheres 40+, destacar garantia de 60 dias, tom mais emocional, mencionar frete grátis.", hint: "Informações extras sobre o produto, a oferta ou o tom. A IA não inventa nada além do que estiver aqui e na página oficial." })}
+  <div class="field"><label for="lang">Idioma da página</label>
+    <select id="lang" name="lang">${Object.entries(LANGS).map(([k, label]) => html`<option value="${k}" ${(v.lang || "en") === k ? raw("selected") : ""}>${label}</option>`)}</select></div>
+  <p class="hint">A IA não cria depoimentos, números, estudos, preços ou promessas de resultado que não estejam nas informações acima. Revise sempre antes de publicar.</p>
+  <div class="row-end">
+    <a class="btn btn-ghost" href="/pages">Cancelar</a>
+    <button class="btn btn-primary" type="submit" data-busy-text="Escrevendo a página… (até 1 minuto)">✨ Gerar página</button>
   </div>
 </form>`);
 }

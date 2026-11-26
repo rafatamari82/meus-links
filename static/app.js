@@ -41,7 +41,11 @@
     var msg = f.getAttribute("data-confirm");
     if (msg && !window.confirm(msg)) { e.preventDefault(); return; }
     var b = f.querySelector("button[type=submit]");
-    if (b) { b.setAttribute("aria-busy", "true"); b.classList.add("is-loading"); }
+    if (b) {
+      b.setAttribute("aria-busy", "true"); b.classList.add("is-loading");
+      var busy = b.getAttribute("data-busy-text");
+      if (busy) { b.textContent = busy; live(busy); }
+    }
     var cp = f.querySelector("[data-copy-after]");
     try { sessionStorage.setItem("copyAfter", cp && cp.checked ? "1" : "0"); } catch (err) {}
   });

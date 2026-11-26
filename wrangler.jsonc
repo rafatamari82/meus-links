@@ -12,5 +12,7 @@
   ],
   // The panel's address. Connect it in Cloudflare (Settings > Domains & Routes > Custom domain).
   // The *.workers.dev address keeps working as a backup way into the panel.
-  "vars": { "APP_HOST": "app.cutti.us" }
+  "vars": { "APP_HOST": "app.cutti.us" },
+  // Cloudflare Workers AI writes the pages (free daily allocation).
+  "ai": { "binding": "AI" }
 }

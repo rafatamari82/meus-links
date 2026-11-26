@@ -134,3 +134,19 @@ test("page data validation", () => {
   assert.match(html, /href="\/a%20b\/go"/);
   assert.match(html, /<html lang="en">/);
 });
+import { aiSchema, buildMessages, extractPage } from "../src/ai.js";
+test("extract product page text and image", () => {
+  const r = extractPage('<html><head><title> T </title><meta property="og:image" content="/i.jpg"></head><body><script>bad()</script><p>Hello &amp; welcome</p><style>x{}</style></body></html>', "https://shop.com/p");
+  assert.equal(r.title, "T");
+  assert.equal(r.image, "https://shop.com/i.jpg");
+  assert.match(r.text, /Hello & welcome/);
+  assert.ok(!/bad\(\)/.test(r.text));
+});
+test("ai prompt carries the safety rules and the right fields", () => {
+  const m = buildMessages({ template: "tsl", productName: "X", lang: "pt", facts: "F", notes: "N" });
+  assert.match(m[0].content, /Never invent testimonials/);
+  assert.match(m[0].content, /cures, treats, prevents/);
+  assert.match(m[1].content, /Brazilian Portuguese/);
+  assert.deepEqual(Object.keys(aiSchema("presell").properties), ["headline", "subheadline", "body", "cta_text"]);
+  assert.ok(!("rating" in aiSchema("review").properties), "the AI never sets the star rating");
+});
