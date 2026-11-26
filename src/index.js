@@ -634,7 +634,7 @@ const PANEL_ROUTES = [
   ["GET", /^\/sales$/, TR.salesPage],
   ["POST", /^\/sales\/([\w-]+)\/delete$/, TR.deleteSale],
   ["GET", /^\/integrations$/, (c) => TR.integrationsPage(c)],
-  ["POST", /^\/integrations\/(settings|key|newsbreak-csv|cost)$/, TR.integrationsPost],
+  ["POST", /^\/integrations\/(settings|key|newsbreak-csv|cost|ntfy|telegram|notify-test|notify-prefs)$/, TR.integrationsPost],
   ["GET", /^\/domains$/, (c) => domainsPage(c)],
   ["POST", /^\/domains$/, addDomain],
   ["POST", /^\/domains\/([\w-]+)\/verify$/, verifyDomain],

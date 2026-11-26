@@ -20,6 +20,11 @@ export async function getSettings(db) {
     eur_brl: Number(s.eur_brl) > 0 ? Number(s.eur_brl) : 6.2,
     nb_postback: s.nb_postback || "",
     gads_conv_name: s.gads_conv_name || "Venda",
+    ntfy_topic: s.ntfy_topic || "",
+    tg_token: s.tg_token || "",
+    tg_chat: s.tg_chat || "",
+    tg_name: s.tg_name || "",
+    notify_refunds: s.notify_refunds !== "0",
   };
 }
 
@@ -101,6 +106,11 @@ export async function postback(c, key, network) {
     `${label} ${T.fmtMoney(p.amount_cents || 0, p.currency || "USD")}${p.txid ? ` · pedido ${p.txid}` : ""}${click ? ` · clique ${click.id}` : p.ids.length ? ` · click ID ${p.ids[0]} não encontrado` : " · sem click ID"}`,
     raw);
 
+  // Phone notification.
+  if (!dup && (p.type === "sale" || p.type === "upsell" || s.notify_refunds)) {
+    c.exec.waitUntil(saleMessage(c.db, network, p, click).then((m) => notify(s, m, c.env.__notifyFetch || fetch)).catch((e) => console.error("notify", e)));
+  }
+
   // Tell NewsBreak about the sale, so its algorithm learns from it.
   if (!dup && click?.nb_callback && s.nb_postback && (p.type === "sale" || p.type === "upsell")) {
     const value = (T.convert(p.amount_cents || 0, p.currency, "USD", s) / 100).toFixed(2);
@@ -108,6 +118,58 @@ export async function postback(c, key, network) {
     if (/^https:\/\//.test(url)) c.exec.waitUntil(fetch(url).catch((e) => console.error("newsbreak postback", e)));
   }
   return text(dup ? "ok (repetido)" : "ok");
+}
+
+// ---------------------------------------------------------------- phone notifications
+
+async function saleMessage(db, network, p, click) {
+  const head = { sale: "💰 Venda!", upsell: "💰 Upsell!", refund: "↩️ Reembolso", chargeback: "⚠️ Chargeback" }[p.type];
+  const value = T.fmtMoney(p.amount_cents || 0, p.currency || "USD");
+  let where = "sem clique rastreado";
+  if (click) {
+    let name = click.campaign || "";
+    if (name) {
+      const r = await db.prepare("select campaign_name from tk_costs where source = ? and campaign_key = ? and campaign_name is not null limit 1")
+        .bind(click.source, name).first();
+      if (r?.campaign_name) name = r.campaign_name;
+    }
+    where = [T.SOURCES[click.source] || click.source, name, click.ad].filter(Boolean).join(" · ");
+  }
+  return { title: `${head} ${value}`, body: `${T.NETWORKS[network]?.name || network} · ${where}`, refund: p.type === "refund" || p.type === "chargeback" };
+}
+
+/** Send to every channel that is set up. Returns a list of errors (empty when all went out). */
+export async function notify(s, m, fetcher = fetch) {
+  const jobs = [];
+  if (s.ntfy_topic) {
+    jobs.push(fetcher("https://ntfy.sh/", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: s.ntfy_topic, title: m.title, message: m.body, priority: m.refund ? 3 : 4, tags: [m.refund ? "warning" : "moneybag"] }),
+    }).then((r) => (r.ok ? null : `ntfy respondeu ${r.status}`)));
+  }
+  if (s.tg_token && s.tg_chat) {
+    jobs.push(fetcher(`https://api.telegram.org/bot${s.tg_token}/sendMessage`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: s.tg_chat, text: `${m.title}\n${m.body}` }),
+    }).then((r) => (r.ok ? null : `Telegram respondeu ${r.status}`)));
+  }
+  const out = await Promise.all(jobs.map((j) => j.catch((e) => `falha de conexão (${e?.name || "erro"})`)));
+  return { sent: jobs.length, errors: out.filter(Boolean) };
+}
+
+async function telegramConnect(c, token) {
+  if (!/^\d{5,15}:[\w-]{30,60}$/.test(token)) return "Esse não parece um token do BotFather (formato 123456789:ABC…).";
+  const api = (m) => fetch(`https://api.telegram.org/bot${token}/${m}`).then((r) => r.json()).catch(() => null);
+  const me = await api("getMe");
+  if (!me?.ok) return "O Telegram não aceitou esse token. Copie de novo no @BotFather.";
+  await setSetting(c.db, "tg_token", token);
+  await setSetting(c.db, "tg_name", me.result.username || "");
+  const up = await api("getUpdates?limit=50");
+  const msgs = (up?.result || []).map((u) => u.message || u.my_chat_member).filter((x) => x?.chat?.id);
+  const chat = msgs.length ? msgs[msgs.length - 1].chat.id : null;
+  if (!chat) return `Bot @${me.result.username} salvo. Agora abra o Telegram, mande /start para ele e clique em Conectar de novo.`;
+  await setSetting(c.db, "tg_chat", String(chat));
+  return null;
 }
 
 export async function googleCost(c, key) {
@@ -317,6 +379,35 @@ export async function integrationsPost(c, action) {
     if (nb && !/^https:\/\/\S+$/.test(nb)) return integrationsPage(c, { settingsError: "O postback da NewsBreak precisa começar com https://." }, 422);
     await setSetting(c.db, "nb_postback", nb.slice(0, 1000));
     c.flash("success", "Configurações salvas.");
+  } else if (action === "ntfy") {
+    const s = await getSettings(c.db);
+    if (f.get("off")) {
+      await setSetting(c.db, "ntfy_topic", "");
+      c.flash("success", "Avisos pelo ntfy desligados.");
+    } else {
+      if (!s.ntfy_topic) await setSetting(c.db, "ntfy_topic", `cutti-${randomToken(12).replace(/[^A-Za-z0-9]/g, "x")}`);
+      c.flash("success", "Tópico criado. Inscreva-se nele no app ntfy e toque em Testar.");
+    }
+  } else if (action === "telegram") {
+    if (f.get("off")) {
+      for (const k of ["tg_token", "tg_chat", "tg_name"]) await setSetting(c.db, k, "");
+      c.flash("success", "Avisos pelo Telegram desligados.");
+    } else {
+      const s = await getSettings(c.db);
+      const token = String(f.get("token") || "").trim() || s.tg_token;
+      const err = await telegramConnect(c, token);
+      if (err) return integrationsPage(c, { tgError: err }, 422);
+      c.flash("success", "Telegram conectado. Toque em Testar.");
+    }
+  } else if (action === "notify-test") {
+    const s = await getSettings(c.db);
+    const r = await notify(s, { title: "💰 Venda! US$ 87,50", body: "Teste do cutti.us · Google Ads · Campanha exemplo" }, c.env.__notifyFetch || fetch);
+    if (!r.sent) c.flash("error", "Nenhum aviso configurado ainda.");
+    else if (r.errors.length) c.flash("error", `Não foi: ${r.errors.join("; ")}`);
+    else c.flash("success", "Aviso de teste enviado. Olhe o celular.");
+  } else if (action === "notify-prefs") {
+    await setSetting(c.db, "notify_refunds", f.get("refunds") ? "1" : "0");
+    c.flash("success", "Preferência salva.");
   } else if (action === "key") {
     await setSetting(c.db, "key", randomToken(24));
     c.flash("success", "Chave trocada. Atualize as URLs de postback nas redes e o script do Google Ads.");

@@ -159,7 +159,7 @@ function copyBox(id, label, value, rows = 0) {
 </div>`;
 }
 
-export function integrationsView(c, { s, base, linkDomain, costCount, settingsError, csvError, csvValue, costError }) {
+export function integrationsView(c, { s, base, linkDomain, costCount, settingsError, csvError, csvValue, costError, tgError }) {
   const pb = (net) => `${base}/pb/${s.key}/${net}`;
   const last = (src) => costCount.find((x) => x.source === src);
   const curOpt = (v, sel) => html`<option ${v === sel ? raw("selected") : ""}>${v}</option>`;
@@ -177,6 +177,8 @@ export function integrationsView(c, { s, base, linkDomain, costCount, settingsEr
   </ol>
   <p class="hint">Se você usa presell, cole este script na presell. Ele passa o código para os links da oferta: <code>&lt;script src="${base}/t.js" data-param="tid" defer&gt;&lt;/script&gt;</code>. Troque <code>tid</code> pelo parâmetro da rede, ou coloque <code>data-param</code> em cada link.</p>
 </section>
+
+${notifySection(c, s, tgError)}
 
 <section class="card table-wrap">
   <div class="pad"><h2 class="h-lg">Redes e plataformas</h2>
@@ -279,3 +281,57 @@ const WHERE = {
   hotmart: "Ferramentas → Webhook → Cadastrar. Eventos: compra aprovada, reembolso, chargeback. O código vai no sck (ou src, como afiliado).",
   kiwify: "Apps → Webhooks → Criar webhook. Eventos: compra aprovada, reembolso, chargeback.",
 };
+
+function notifySection(c, s, tgError) {
+  const tgOn = s.tg_token && s.tg_chat;
+  const any = s.ntfy_topic || tgOn;
+  return html`
+<section class="card pad" id="avisos">
+  <h2 class="h-lg">Avisos de venda no celular</h2>
+  <p class="muted">Cada venda (e, se quiser, cada reembolso) chega como notificação no celular, com valor, rede e campanha. Use um dos dois, ou os dois.</p>
+  <div class="notify-grid">
+    <div class="notify-box">
+      <h3 class="h-md">App ntfy ${s.ntfy_topic ? html`<span class="badge badge-success">Ligado</span>` : ""}</h3>
+      ${s.ntfy_topic ? html`
+      <ol class="steps">
+        <li>Instale o app <strong>ntfy</strong> (App Store ou Google Play). Não precisa criar conta.</li>
+        <li>No app, toque em <strong>+</strong> e inscreva-se neste tópico:</li>
+      </ol>
+      <div class="copy-row"><input value="${s.ntfy_topic}" readonly aria-label="Tópico do ntfy" spellcheck="false"><button class="btn btn-secondary btn-sm" type="button" data-copy="${s.ntfy_topic}">Copiar</button></div>
+      <p class="hint">Quem souber o nome do tópico vê os avisos. Não compartilhe.</p>
+      <form method="post" action="/integrations/ntfy">${csrfField(c)}<input type="hidden" name="off" value="1"><button class="btn btn-ghost btn-xs danger-text" type="submit">Desligar</button></form>`
+    : html`
+      <p class="hint">O jeito mais rápido: um app de notificações, sem conta e sem configurar nada.</p>
+      <form method="post" action="/integrations/ntfy">${csrfField(c)}<button class="btn btn-primary" type="submit">Ativar ntfy</button></form>`}
+    </div>
+    <div class="notify-box">
+      <h3 class="h-md">Telegram ${tgOn ? html`<span class="badge badge-success">Ligado${s.tg_name ? ` · @${s.tg_name}` : ""}</span>` : ""}</h3>
+      ${tgOn ? html`
+      <p class="hint">As vendas chegam como mensagem do seu bot${s.tg_name ? ` @${s.tg_name}` : ""}.</p>
+      <form method="post" action="/integrations/telegram">${csrfField(c)}<input type="hidden" name="off" value="1"><button class="btn btn-ghost btn-xs danger-text" type="submit">Desligar</button></form>`
+    : html`
+      <ol class="steps">
+        <li>No Telegram, abra o <strong>@BotFather</strong>, mande <code>/newbot</code> e escolha um nome. Ele te dá um token.</li>
+        <li>Abra o seu bot novo e mande <code>/start</code>.</li>
+        <li>Cole o token aqui e clique em Conectar.</li>
+      </ol>
+      <form method="post" action="/integrations/telegram" class="stack" novalidate>
+        ${csrfField(c)}
+        <div class="field">
+          <label for="tg-token">Token do bot</label>
+          <input id="tg-token" name="token" autocomplete="off" spellcheck="false" placeholder="${s.tg_token ? "token salvo, deixe vazio" : "123456789:ABC…"}" ${tgError ? raw('aria-invalid="true" aria-describedby="tg-err"') : ""}>
+          ${fieldError("tg-err", tgError)}
+        </div>
+        <button class="btn btn-primary" type="submit">Conectar</button>
+      </form>`}
+    </div>
+  </div>
+  <div class="row notify-foot">
+    <form method="post" action="/integrations/notify-prefs" class="row">
+      ${csrfField(c)}
+      <label class="check"><input type="checkbox" name="refunds" value="1" ${s.notify_refunds ? raw("checked") : ""} data-autosubmit> Avisar também reembolsos e chargebacks</label>
+    </form>
+    ${any ? html`<form method="post" action="/integrations/notify-test">${csrfField(c)}<button class="btn btn-secondary" type="submit">Testar aviso</button></form>` : ""}
+  </div>
+</section>`;
+}

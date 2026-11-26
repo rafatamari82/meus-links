@@ -479,6 +479,24 @@ class E2E(unittest.TestCase):
         p.get_by_role("button", name="Salvar").last.click()
         expect(p.get_by_role("alert")).to_contain_text("câmbio maior que zero")
 
+    def test_t04_phone_notifications(self):
+        p = self.page
+        p.goto(self.base + "/integrations")
+        p.get_by_role("button", name="Ativar ntfy").click()
+        topic = p.get_by_label("Tópico do ntfy").input_value()
+        self.assertTrue(topic.startswith("cutti-"))
+        p.get_by_role("button", name="Testar aviso").click()
+        expect(p.get_by_text("Aviso de teste enviado")).to_be_visible()
+        p.get_by_label("Token do bot").fill("isso-nao-e-token")
+        p.get_by_role("button", name="Conectar").click()
+        expect(p.locator("#tg-err")).to_contain_text("BotFather")
+        p.goto(self.base + "/integrations")
+        p.get_by_label("Avisar também reembolsos").uncheck()
+        expect(p.get_by_text("Preferência salva")).to_be_visible()
+        expect(p.get_by_label("Avisar também reembolsos")).not_to_be_checked()
+        p.locator("#avisos").get_by_role("button", name="Desligar").click()
+        expect(p.get_by_role("button", name="Ativar ntfy")).to_be_visible()
+
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
                                      storage_state=self.ctx.storage_state()).new_page()

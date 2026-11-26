@@ -212,3 +212,8 @@ input[type=date] { height: 40px; padding: 0 var(--space-2); font: inherit; color
 }
 .page-head .filters select { width: auto; flex: 0 0 auto; }
 .page-head .filters { align-items: center; }
+.notify-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }
+.notify-box { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); }
+.notify-box > * + * { margin-top: var(--space-3); }
+.h-md { font-size: var(--text-base); line-height: var(--leading-base); font-weight: 600; margin: 0; }
+.notify-foot { justify-content: space-between; margin-top: var(--space-4); }

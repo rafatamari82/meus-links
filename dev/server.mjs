@@ -17,6 +17,14 @@ env.__testFetch = async (url, init) => {
   return fetch(base + u.pathname + u.search, { ...init, headers: { ...(init?.headers || {}), "X-Test-Host": u.hostname } });
 };
 
+// Test hook: phone notifications are logged instead of sent.
+if (process.env.TEST_ROUTES) {
+  env.__notifyFetch = async (url, init) => {
+    console.log("NOTIFY", url.replace(/bot[^/]+/, "bot***"), init?.body);
+    return new Response("{}", { status: 200 });
+  };
+}
+
 http.createServer(async (req, res) => {
   const chunks = [];
   for await (const ch of req) chunks.push(ch);
