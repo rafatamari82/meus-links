@@ -48,7 +48,7 @@ function chart(series, cur) {
 <tbody>${series.map((x) => html`<tr><th scope="row">${ddmm(x.d)}</th><td>${fmtMoney(x.rev, cur)}</td><td>${fmtMoney(x.cost, cur)}</td></tr>`)}</tbody></table>`;
 }
 
-export function resultsView(c, { s, range, byAd, srcFilter, list, tot, series, hasAny }) {
+export function resultsView(c, { s, range, byAd, srcFilter, list, tot, series, hasAny, sources = [] }) {
   const cur = s.currency;
   const m = (x) => (x == null ? "—" : fmtMoney(x, cur));
   const tab = (label, params, on) => html`<a class="tab ${on ? "is-current" : ""}" href="/results?${new URLSearchParams(params)}" ${on ? raw('aria-current="page"') : ""}>${label}</a>`;
@@ -89,7 +89,7 @@ ${empty}
       ${tab("Campanhas", { ...base, ...withSrc }, !byAd)}${tab("Anúncios", { ...base, ...withSrc, by: "ad" }, byAd)}
     </nav>
     <nav class="tabs" aria-label="Origem">
-      ${tab("Todas", { ...base, ...withBy }, !srcFilter)}${tab("Google Ads", { ...base, ...withBy, source: "google" }, srcFilter === "google")}${tab("NewsBreak", { ...base, ...withBy, source: "newsbreak" }, srcFilter === "newsbreak")}
+      ${tab("Todas", { ...base, ...withBy }, !srcFilter)}${tab("Google Ads", { ...base, ...withBy, source: "google" }, srcFilter === "google")}${tab("NewsBreak", { ...base, ...withBy, source: "newsbreak" }, srcFilter === "newsbreak")}${sources.filter((x) => !["google", "newsbreak", "none"].includes(x)).map((x) => tab(SOURCE_LABEL[x] || x, { ...base, ...withBy, source: x }, srcFilter === x))}
     </nav>
   </div>
   ${list.length ? html`

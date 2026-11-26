@@ -535,6 +535,30 @@ class E2E(unittest.TestCase):
         p.get_by_role("button", name="Voltar ao padrão").click()
         expect(p.locator("#tpl-sale_title")).to_have_value("{emoji} {tipo}! {valor}")
 
+    def test_t07_organic_youtube_video(self):
+        p = self.page
+        p.goto(self.base + "/links")
+        p.get_by_role("button", name="Novo link").first.click()
+        dlg = p.get_by_role("dialog")
+        dlg.get_by_label("Destino").fill("https://oferta.exemplo.com/yt")
+        dlg.get_by_label("Final do link").fill("yt-bolo")
+        dlg.get_by_label("Nome").fill("Vídeo: bolo de cenoura")
+        dlg.locator("summary", has_text="Rastrear vendas").click()
+        dlg.get_by_label("Gerar um código por clique").check()
+        dlg.get_by_label("Rede ou plataforma").select_option(label="BuyGoods")
+        dlg.get_by_label("De onde vem o clique").select_option(label="YouTube")
+        dlg.get_by_role("button", name="Criar link").click()
+        expect(p.locator("tr.is-new")).to_contain_text("Rastreado · BuyGoods · YouTube")
+        status, loc = self.hit(self.base + "/yt-bolo")
+        cid = re.search(r"subid=(ct[a-z2-7]{10})", loc).group(1)
+        key = self.tracker_key()
+        self.assertEqual(p.request.get(f"{self.base}/pb/{key}/buygoods?cid={cid}&amount=33&txid=YT1").text(), "ok")
+        p.goto(self.base + "/results?p=today")
+        p.get_by_role("link", name="YouTube").click()
+        row = p.locator("tr", has_text="Vídeo: bolo de cenoura")
+        expect(row.locator("td[data-label=Vendas]")).to_have_text("1")
+        expect(row).to_contain_text("YouTube")
+
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
                                      storage_state=self.ctx.storage_state()).new_page()

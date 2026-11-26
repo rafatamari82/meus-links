@@ -27,7 +27,12 @@ export const NETWORKS = {
   other: { name: "Outra rede", param: "sub1", currency: "USD", query: "cid=SUBID&amount=VALOR&txid=PEDIDO", check: true },
 };
 
-export const SOURCES = { google: "Google Ads", newsbreak: "NewsBreak", other: "Outros" };
+export const SOURCES = {
+  google: "Google Ads", newsbreak: "NewsBreak", youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok",
+  facebook: "Facebook", email: "E-mail", whatsapp: "WhatsApp", organic: "Orgânico", other: "Outros",
+};
+// Fixed origin a tracked link can carry, for links that sit in organic places (video descriptions, bios).
+export const LINK_SOURCES = ["ads", "youtube", "instagram", "tiktok", "facebook", "email", "whatsapp", "organic"];
 
 export function cleanParam(raw) {
   const p = String(raw ?? "").trim();
@@ -47,7 +52,8 @@ export function readClickParams(params) {
   let source = (get("src", "utm_source") || "").toLowerCase();
   if (gclid || source.startsWith("google")) source = "google";
   else if (source.includes("newsbreak") || params.get("nbcb")) source = "newsbreak";
-  else source = source ? "other" : "other";
+  else if (SOURCES[source] && source !== "other") { /* youtube, instagram… typed in ?src= */ }
+  else source = "other";
   return {
     source,
     campaign: get("cmp", "campaign_id", "utm_campaign", "campaign"),

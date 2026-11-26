@@ -13,7 +13,7 @@ import {
 } from "./security.js";
 import * as V from "./views.js";
 import * as TR from "./tracker-routes.js";
-import { cleanParam, NETWORKS } from "./tracker.js";
+import { cleanParam, LINK_SOURCES, NETWORKS } from "./tracker.js";
 
 const SESSION_DAYS = 30;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -297,7 +297,8 @@ async function readLinkForm(c) {
   values.track = f.get("track") ? "1" : "";
   values.network = NETWORKS[String(f.get("network"))] ? String(f.get("network")) : "other";
   values.sub_param = String(f.get("sub_param") || "");
-  const track = { on: values.track ? 1 : 0, network: values.network, sub_param: cleanParam(values.sub_param) };
+  values.track_source = LINK_SOURCES.includes(String(f.get("track_source"))) ? String(f.get("track_source")) : "ads";
+  const track = { on: values.track ? 1 : 0, network: values.network, sub_param: cleanParam(values.sub_param), source: values.track_source };
   if (track.on && !track.sub_param) errors.sub_param = "Use só letras, números, ponto, hífen ou sublinhado (ex.: tid).";
   return { values, errors, dest, slug, domain, title, geo, track };
 }
@@ -400,8 +401,8 @@ async function createLink(c) {
       const s = slug || core.randomSlug();
       try {
         await c.db.prepare(
-          "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, geo_mode, geo_countries, track, network, sub_param, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        ).bind(id, c.user.id, domain.id, s, s.toLowerCase(), dest, title, geo.mode, geo.countries, track.on, track.on ? track.network : null, track.on ? track.sub_param : null, ts, ts).run();
+          "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, geo_mode, geo_countries, track, network, sub_param, track_source, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        ).bind(id, c.user.id, domain.id, s, s.toLowerCase(), dest, title, geo.mode, geo.countries, track.on, track.on ? track.network : null, track.on ? track.sub_param : null, track.source, ts, ts).run();
         c.flash("success", "Link criado.");
         return c.redirect(`/links?new=${id}`);
       } catch (e) {
@@ -424,7 +425,7 @@ async function editLink(c, id) {
   let values = {
     destination: link.destination, slashtag: link.slashtag, title: link.title || "", domain_id: link.domain_id,
     geo_mode: link.geo_mode || "off", geo_countries: link.geo_countries || "",
-    track: link.track ? "1" : "", network: link.network || "clickbank", sub_param: link.sub_param || "",
+    track: link.track ? "1" : "", network: link.network || "clickbank", sub_param: link.sub_param || "", track_source: link.track_source || "ads",
   };
   let errors = {};
   if (c.req.method === "POST") {
@@ -435,9 +436,9 @@ async function editLink(c, id) {
     if (!Object.keys(errors).length) {
       try {
         await c.db.prepare(
-          "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, geo_mode = ?, geo_countries = ?, track = ?, network = ?, sub_param = ?, updated_at = ? where id = ? and user_id = ?",
+          "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, geo_mode = ?, geo_countries = ?, track = ?, network = ?, sub_param = ?, track_source = ?, updated_at = ? where id = ? and user_id = ?",
         ).bind(r.dest, r.slug, r.slug.toLowerCase(), r.title, r.domain.id, r.geo.mode, r.geo.countries, r.track.on,
-          r.track.on ? r.track.network : null, r.track.on ? r.track.sub_param : null, now(), id, c.user.id).run();
+          r.track.on ? r.track.network : null, r.track.on ? r.track.sub_param : null, r.track.source, now(), id, c.user.id).run();
         c.flash("success", "Alterações salvas.");
         return c.redirect("/links");
       } catch (e) {

@@ -72,4 +72,5 @@ export const MIGRATIONS = [
   `alter table links add column track integer not null default 0`,
   `alter table links add column network text`,
   `alter table links add column sub_param text`,
+  `alter table links add column track_source text`,
 ];

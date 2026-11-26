@@ -51,6 +51,9 @@ async function setSetting(db, key, value) {
 export function trackClick(c, link, { country, device }) {
   const cid = T.newClickId();
   const p = T.readClickParams(c.url.searchParams);
+  // Organic link: the origin is fixed on the link, and the link's name tells which video or post it is.
+  if (link.track_source && link.track_source !== "ads") p.source = link.track_source;
+  if (!p.campaign) p.campaign = (link.title || link.slashtag || "").slice(0, 200);
   const target = T.trackedTarget(link.destination, c.url.search, link.sub_param, cid);
   const write = c.db.prepare(
     "insert into tk_clicks (id, link_id, at, source, campaign, adset, ad, keyword, gclid, nb_callback, country, device) values (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -402,7 +405,9 @@ export async function resultsPage(c) {
   const series = days.map((d) => ({ d, rev: dayRev[d], cost: dayCost[d] }));
 
   const hasAny = (await db.prepare("select (select count(*) from tk_clicks) + (select count(*) from tk_conversions) + (select count(*) from tk_costs) as n").first()).n;
-  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, list, tot, series, hasAny }));
+  const sources = (await db.prepare("select distinct source from tk_clicks").all()).results.map((r) => r.source);
+  if (srcFilter && !sources.includes(srcFilter)) sources.push(srcFilter);
+  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, list, tot, series, hasAny, sources }));
 }
 
 export async function salesPage(c) {

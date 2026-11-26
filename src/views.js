@@ -1,6 +1,6 @@
 // HTML views. Every interpolated value is escaped unless wrapped in raw().
 import { countryName, countryOptions } from "./core.js";
-import { NETWORKS } from "./tracker.js";
+import { LINK_SOURCES, NETWORKS, SOURCES } from "./tracker.js";
 
 class Raw {
   constructor(s) { this.s = s; }
@@ -218,6 +218,13 @@ function trackFields(v, e) {
       ${fieldError("sub-err", e.sub_param)}
     </div>
   </div>
+  <div class="field">
+    <label for="track_source">De onde vem o clique</label>
+    <select id="track_source" name="track_source">
+      ${LINK_SOURCES.map((k) => html`<option value="${k}" ${(v.track_source || "ads") === k ? raw("selected") : ""}>${k === "ads" ? "Anúncio (Google Ads ou NewsBreak, pelo modelo de rastreamento)" : SOURCES[k]}</option>`)}
+    </select>
+    <p class="hint">Para orgânico, crie um link por vídeo ou post e dê a ele o nome do vídeo no campo Nome: é esse nome que aparece em Resultados.</p>
+  </div>
   <p class="hint">Se o destino é uma presell, deixe o parâmetro e cole o script de Integrações na presell.</p>
 </details>`;
 }
@@ -254,7 +261,7 @@ export function linksView(c, { rows, total, q, domainFilter, domains, activeDoma
     <tr class="${l.id === newId ? "is-new" : ""}" data-link-id="${l.id}">
       <td data-label="Link">
         ${l.title ? html`<div class="link-title">${l.title}</div>` : ""}
-        ${l.track ? html`<div class="hint"><span class="badge badge-accent">Rastreado · ${NETWORKS[l.network]?.name || l.network}</span></div>` : ""}
+        ${l.track ? html`<div class="hint"><span class="badge badge-accent">Rastreado · ${NETWORKS[l.network]?.name || l.network}${l.track_source && l.track_source !== "ads" ? ` · ${SOURCES[l.track_source]}` : ""}</span></div>` : ""}
         ${l.geo_mode && l.geo_mode !== "off" ? html`<div class="hint">${l.geo_mode === "block" ? "Bloqueado em" : "Só funciona em"} ${geoSummary(l.geo_countries)}</div>` : ""}
         <div class="short-row">
           <a class="short-url" href="${shortUrl(l)}" target="_blank" rel="noopener">${l.domain_name}/${l.slashtag}</a>
