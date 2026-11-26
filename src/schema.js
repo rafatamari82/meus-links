@@ -74,4 +74,7 @@ export const MIGRATIONS = [
   `alter table links add column sub_param text`,
   `alter table links add column track_source text`,
   `alter table tk_conversions add column product text`,
+  `alter table tk_conversions add column gads_sent_at text`,
+  `alter table tk_conversions add column gads_tries integer`,
+  `alter table tk_conversions add column gads_error text`,
 ];

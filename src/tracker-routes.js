@@ -2,6 +2,7 @@
 import * as T from "./tracker.js";
 import { newId, randomToken, safeEqual } from "./security.js";
 import { newVapidKeys, sendPush } from "./webpush.js";
+import * as GA from "./googleads.js";
 import * as TV from "./tracker-views.js";
 
 const nowIso = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -165,10 +166,14 @@ export async function postback(c, key, network) {
   }
   if (p.type === "sale" && p.upsell) p.type = "upsell";
   const txid = p.txid || (click ? `${click.id}` : `sem-id-${randomToken(6)}`);
+  const convId = randomToken(12);
   const res = await c.db.prepare(
     "insert or ignore into tk_conversions (id, click_id, network, txid, type, amount_cents, currency, at, product) values (?,?,?,?,?,?,?,?,?)",
-  ).bind(randomToken(12), click?.id || null, network, txid, p.type, Math.abs(p.amount_cents || 0), p.currency || "USD", nowIso(), p.product || null).run();
+  ).bind(convId, click?.id || null, network, txid, p.type, Math.abs(p.amount_cents || 0), p.currency || "USD", nowIso(), p.product || null).run();
   const dup = !res.meta?.changes;
+  if (!dup) {
+    c.exec.waitUntil(GA.onConversion(c, { id: convId, type: p.type, txid: p.txid, network, gclid: click?.gclid }));
+  }
   const outcome = dup ? "repetido" : click ? "ok" : "sem clique";
   const label = { sale: "venda", upsell: "upsell", refund: "reembolso", chargeback: "chargeback" }[p.type];
   await logEvent(c.db, network, outcome,
@@ -576,7 +581,7 @@ export async function trackingPage(c, extra = {}, status = 200) {
   const d = await c.db.prepare("select full_name from domains where user_id = ? and active = 1 order by is_default desc, type asc limit 1")
     .bind(c.user.id).first();
   const costCount = (await c.db.prepare("select source, count(*) as n, max(updated_at) as last from tk_costs group by source").all()).results;
-  const google = c.googleBox ? await c.googleBox(c, s) : "";
+  const google = await GA.googleBox(c, s, extra);
   return c.respond(TV.trackingView(c.view(), {
     s, base: `https://${c.panelHost()}`, linkDomain: d?.full_name || c.panelHost(), costCount, google, ...extra,
   }), status);

@@ -22,6 +22,35 @@ env.__ratesFetch = async () => new Response(JSON.stringify({ USDBRL: { bid: "5.4
 
 // Test hook: phone notifications are logged instead of sent.
 if (process.env.TEST_ROUTES) {
+  // Fake Google (OAuth + Ads API) so the connect flow runs offline.
+  env.__googleFetch = async (url, init = {}) => {
+    const j = (o, st = 200) => new Response(JSON.stringify(o), { status: st, headers: { "Content-Type": "application/json" } });
+    const u = String(url);
+    console.log("GOOGLE", init.method || "GET", u.replace(/^https:\/\/[^/]+/, ""));
+    if (u.startsWith("https://oauth2.googleapis.com/token")) {
+      const b = new URLSearchParams(init.body);
+      if (b.get("grant_type") === "authorization_code") return j({ access_token: "at", refresh_token: "rt-test", expires_in: 3600 });
+      return j({ access_token: "at", expires_in: 3600 });
+    }
+    if (u.endsWith("customers:listAccessibleCustomers")) return j({ resourceNames: ["customers/1112223333", "customers/9998887777"] });
+    const body = init.body ? JSON.parse(init.body) : {};
+    if (u.includes("googleAds:search")) {
+      const q = body.query || "";
+      if (q.includes("FROM customer")) {
+        const id = u.match(/customers\/(\d+)/)[1];
+        return j({ results: [{ customer: { id, descriptiveName: id === "1112223333" ? "Conta Teste" : "Minha MCC", currencyCode: "USD", manager: id !== "1112223333" } }] });
+      }
+      if (q.includes("FROM conversion_action")) return j({ results: [] });
+      if (q.includes("FROM campaign")) {
+        const d = new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 10);
+        return j({ results: [{ segments: { date: d }, campaign: { id: "777", name: "Campanha API" }, metrics: { costMicros: "12340000", clicks: "10", impressions: "100" } }] });
+      }
+    }
+    if (u.includes("conversionActions:mutate")) return j({ results: [{ resourceName: "customers/1112223333/conversionActions/555" }] });
+    if (u.includes(":uploadClickConversions")) return j({ results: body.conversions.map(() => ({})) });
+    if (u.includes(":uploadConversionAdjustments")) return j({ results: [{}] });
+    return j({ error: { status: "NOT_FOUND", message: u } }, 404);
+  };
   env.EMAIL_TO = "voce@exemplo.com";
   env.EMAIL = { send: async (m) => { console.log("EMAIL", m.from?.email, m.subject); return { messageId: "dev" }; } };
   env.__notifyFetch = async (url, init) => {

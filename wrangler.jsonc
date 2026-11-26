@@ -12,6 +12,7 @@
   ],
   // The panel's address. Connect it in Cloudflare (Settings > Domains & Routes > Custom domain).
   // The *.workers.dev address keeps working as a backup way into the panel.
+  "triggers": { "crons": ["*/30 * * * *"] },
   "send_email": [ { "name": "EMAIL", "destination_address": "rafatamari82@gmail.com" } ],
   "vars": { "APP_HOST": "app.cutti.us", "EMAIL_TO": "rafatamari82@gmail.com" }
 }

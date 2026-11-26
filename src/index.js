@@ -14,6 +14,7 @@ import {
 import * as V from "./views.js";
 import * as TR from "./tracker-routes.js";
 import * as ST from "./settings.js";
+import * as GA from "./googleads.js";
 import { cleanParam, LINK_SOURCES, NETWORKS } from "./tracker.js";
 
 const SESSION_DAYS = 30;
@@ -641,6 +642,9 @@ const PANEL_ROUTES = [
   ["GET", /^\/settings\/password$/, (c) => ST.passwordPage(c)],
   ["POST", /^\/settings\/password$/, ST.passwordPost],
   ["GET", /^\/tracking$/, (c) => TR.trackingPage(c)],
+  ["GET", /^\/tracking\/google\/connect$/, GA.googleConnect],
+  ["GET", /^\/tracking\/google\/callback$/, GA.googleCallback],
+  ["POST", /^\/tracking\/google\/(credentials|customer|sync|disconnect|forget)$/, GA.googlePost],
   ["GET", /^\/integrations$/, (c) => TR.integrationsPage(c)],
   ["POST", /^\/integrations\/(settings|tracking-settings|key|newsbreak-csv|cost|ntfy|telegram|notify-test|notify-prefs|templates|push-subscribe|push-delete-[\w-]+)$/, TR.integrationsPost],
   ["GET", /^\/domains$/, (c) => domainsPage(c)],
@@ -711,6 +715,13 @@ async function handle(req, env, exec) {
 }
 
 export default {
+  // Every 30 minutes: Google Ads cost and any sale that did not reach Google yet.
+  async scheduled(event, env, exec) {
+    const c = new Ctx(new Request(`https://${env.APP_HOST || "localhost"}/`), env, exec);
+    await ensureSchema(c.db);
+    c.secret = await getSecret(c.db);
+    exec.waitUntil(GA.scheduledSync(c));
+  },
   async fetch(req, env, exec) {
     try {
       return await handle(req, env, exec);
