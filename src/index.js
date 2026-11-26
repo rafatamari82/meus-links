@@ -13,7 +13,6 @@ import {
 } from "./security.js";
 import * as V from "./views.js";
 import { cleanPageData, defaultPageData, PAGE_CSP, renderPage, TEMPLATES } from "./pages.js";
-import { fetchProductPage, generatePage } from "./ai.js";
 
 const SESSION_DAYS = 30;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -705,66 +704,6 @@ async function pageEditor(c, id) {
   return c.respond(V.pageEditorView(c.view(), { template, link, values, errors, activeDomains, isNew }), 422);
 }
 
-async function aiPage(c) {
-  const template = c.req.method === "POST" ? String((await c.form()).get("template") || "") : c.url.searchParams.get("template");
-  if (!TEMPLATES[template]) return c.redirect("/pages");
-  if (c.req.method !== "POST") return c.respond(V.aiFormView(c.view(), { template, values: { lang: "en" }, errors: {} }));
-
-  const f = await c.form();
-  const values = {};
-  for (const k of ["product_name", "destination", "product_url", "notes", "lang"]) values[k] = String(f.get(k) || "").trim();
-  const errors = {};
-  if (!values.product_name) errors.product_name = "Digite o nome do produto.";
-  else if (values.product_name.length > 100) errors.product_name = "Use no máximo 100 caracteres.";
-  let dest = null;
-  try { dest = core.cleanDestination(values.destination); } catch (e) { errors.destination = e.message; }
-  let productUrl = null;
-  if (values.product_url) {
-    try { productUrl = core.cleanDestination(values.product_url); } catch { errors.product_url = "Esse endereço não parece válido."; }
-  }
-  values.notes = values.notes.slice(0, 3000);
-  const lang = ["en", "pt", "es"].includes(values.lang) ? values.lang : "en";
-  if (Object.keys(errors).length) return c.respond(V.aiFormView(c.view(), { template, values, errors }), 422);
-
-  const ai = c.env.__testAI || c.env.AI;
-  if (!ai) {
-    return c.respond(V.aiFormView(c.view(), { template, values, errors: { form: "A IA não está ligada neste app. Confira o \"ai\" no wrangler.jsonc." } }), 503);
-  }
-  let facts = "";
-  let image = "";
-  let pageNote = "";
-  if (productUrl) {
-    try {
-      const pg = await fetchProductPage(productUrl, c.env.__testFetch || fetch);
-      facts = [pg.title, pg.text].filter(Boolean).join("\n");
-      image = pg.image || "";
-      if (facts.length < 200) pageNote = "A página oficial tinha pouco texto legível; confira se faltou informação.";
-    } catch (e) {
-      pageNote = `Não consegui ler a página oficial (${e.message}); a IA usou só o nome e as observações.`;
-    }
-  }
-  let gen;
-  try {
-    gen = await generatePage(ai, c.env.AI_MODEL, { template, productName: values.product_name, lang, facts, notes: values.notes });
-  } catch (e) {
-    console.error("ai failed", e);
-    const msg = /limit|quota|neuron|429|4006/i.test(String(e?.message || e))
-      ? "O limite grátis diário da IA acabou. Ele volta amanhã às 21h (horário de Brasília)."
-      : "A IA não conseguiu escrever a página agora. Tente de novo em instantes.";
-    return c.respond(V.aiFormView(c.view(), { template, values, errors: { form: msg } }), 502);
-  }
-  const base = defaultPageData(template, lang);
-  const pageValues = {
-    ...base, ...gen, lang, image, destination: dest, product_name: gen.product_name || values.product_name,
-    cta_text: gen.cta_text || base.cta_text, geo_mode: "off",
-  };
-  const view = c.view();
-  view.aiNotice = pageNote || true;
-  return c.respond(V.pageEditorView(view, {
-    template, link: null, values: pageValues, errors: {}, activeDomains: await userDomains(c, true), isNew: true,
-  }));
-}
-
 function notFound(c) {
   return c.respond(V.publicNotFound(ASSET_VERSION), 404);
 }
@@ -781,8 +720,6 @@ function serveAsset(c, name) {
 
 const PANEL_ROUTES = [
   ["GET", /^\/pages$/, pagesPage],
-  ["GET", /^\/pages\/ai$/, aiPage],
-  ["POST", /^\/pages\/ai$/, aiPage],
   ["GET", /^\/pages\/new$/, (c) => pageEditor(c, null)],
   ["POST", /^\/pages\/new$/, (c) => pageEditor(c, null)],
   ["GET", /^\/pages\/([\w-]+)\/edit$/, pageEditor],

@@ -40,8 +40,7 @@ class E2E(unittest.TestCase):
         cls.short = f"http://127.0.0.1:{cls.port}"
         cls.tmp = tempfile.mkdtemp()
         env = dict(os.environ, DB_PATH=os.path.join(cls.tmp, "t.db"), PORT=str(cls.port),
-                   TEST_ROUTES=f"go.verifica.com=http://127.0.0.1:{cls.port},produto.teste.com=http://127.0.0.1:{cls.port}",
-                   TEST_AI="1")
+                   TEST_ROUTES=f"go.verifica.com=http://127.0.0.1:{cls.port}")
         cls.server = subprocess.Popen(["node", "dev/server.mjs"], cwd=ROOT, env=env,
                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(50):
@@ -373,7 +372,7 @@ class E2E(unittest.TestCase):
     def new_page(self, template_label, fill):
         p = self.page
         p.goto(self.base + "/pages")
-        p.get_by_role("link", name=f"Criar {template_label} sem IA").click()
+        p.get_by_role("link", name=f"Criar {template_label}").click()
         for label, value in fill.items():
             p.get_by_label(label, exact=True).fill(value)
         p.get_by_role("button", name="Publicar página").click()
@@ -462,38 +461,6 @@ class E2E(unittest.TestCase):
         # a page and a link cannot share an address
         self.create("https://exemplo.com", "editavel")
         expect(p.locator("#slashtag-err")).to_contain_text("já está em uso")
-
-    def test_f10_ai_tsl(self):
-        p = self.page
-        p.goto(self.base + "/pages")
-        p.get_by_role("link", name="✨ Criar TSL com IA").click()
-        p.get_by_label("Nome do produto").fill("SuperMix")
-        p.get_by_label("Seu link de afiliado").fill("https://afiliado.exemplo.com/sm")
-        p.get_by_label("Página oficial do produto (recomendado)").fill("https://produto.teste.com/")
-        p.get_by_role("button", name="✨ Gerar página").click()
-        expect(p.get_by_text("Texto escrito pela IA")).to_be_visible()
-        expect(p.get_by_label("Título principal", exact=True)).to_have_value("headline for SuperMix")
-        expect(p.get_by_label("Texto da carta de vendas", exact=True)).to_have_value(re.compile("Facts seen: yes"))
-        expect(p.get_by_label("Imagem principal (endereço)", exact=True)).to_have_value("https://produto.teste.com/img.jpg")
-        expect(p.get_by_label("Link do botão (seu link de afiliado)")).to_have_value("https://afiliado.exemplo.com/sm")
-        p.get_by_label("Final do endereço (opcional)").fill("supermix")
-        p.get_by_role("button", name="Publicar página").click()
-        expect(p.get_by_text("Página publicada.")).to_be_visible()
-        body = p.request.get(self.base + "/supermix").text()
-        self.assertIn("<h1>headline for SuperMix</h1>", body)
-        self.assertIn('href="/supermix/go"', body)
-
-    def test_f10_ai_without_official_page_and_errors(self):
-        p = self.page
-        p.goto(self.base + "/pages/ai?template=presell")
-        p.get_by_role("button", name="✨ Gerar página").click()
-        expect(p.locator("#f-product_name-err")).to_be_visible()
-        p.get_by_label("Nome do produto").fill("NoPage")
-        p.get_by_label("Seu link de afiliado").fill("https://afiliado.exemplo.com/np")
-        p.get_by_label("Página oficial do produto (recomendado)").fill("https://nao-existe.teste.com/")
-        p.get_by_role("button", name="✨ Gerar página").click()
-        expect(p.get_by_text("Não consegui ler a página oficial")).to_be_visible()
-        expect(p.get_by_label("Título principal", exact=True)).to_have_value("headline for NoPage")
 
     # F08 search
     def test_f08_search(self):
