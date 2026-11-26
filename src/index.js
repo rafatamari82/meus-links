@@ -74,10 +74,20 @@ class Ctx {
     return this.req.headers.get("CF-Connecting-IP") || "local";
   }
 
+  /** The configured panel host (APP_HOST), or this host when it is the workers.dev address. */
   panelHost() {
     const configured = (this.env.APP_HOST || "").toLowerCase().trim();
     if (configured) return configured;
-    return this.host.endsWith(".workers.dev") || this.host === "localhost" ? this.host : null;
+    return this.isBackupPanel() ? this.host : null;
+  }
+
+  // The *.workers.dev address always keeps the panel, so a domain mistake can never lock the owner out.
+  isBackupPanel() {
+    return this.host.endsWith(".workers.dev") || this.host === "localhost";
+  }
+
+  isPanel() {
+    return this.host === this.panelHost() || this.isBackupPanel();
   }
 
   async form() {
@@ -484,7 +494,9 @@ async function addDomain(c) {
   } catch (e) {
     return domainsPage(c, e.message, value, 422);
   }
-  if (name === c.panelHost()) return domainsPage(c, "Esse já é o domínio do painel.", value, 422);
+  if (name === c.panelHost() || (name.endsWith(".workers.dev"))) {
+    return domainsPage(c, "Esse é o endereço do painel; use outro domínio para os links.", value, 422);
+  }
   const ts = now();
   try {
     await c.db.prepare(
@@ -621,8 +633,7 @@ async function handle(req, env, exec) {
   await ensureSchema(c.db);
   c.secret = await getSecret(c.db);
 
-  const panel = c.panelHost();
-  if (c.host !== panel) return serveShort(c, decodePath(path.slice(1)));
+  if (!c.isPanel()) return serveShort(c, decodePath(path.slice(1)));
 
   if (path === "/health") return new Response("ok", { headers: { "Content-Type": "text/plain" } });
 

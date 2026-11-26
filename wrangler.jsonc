@@ -9,7 +9,8 @@
   "observability": { "enabled": true },
   "d1_databases": [
     { "binding": "DB", "database_name": "meus-links" }
-  ]
-  // Optional: to open the panel on your own domain instead of *.workers.dev,
-  // add  "vars": { "APP_HOST": "links.seudominio.com" }  and connect that domain too.
+  ],
+  // The panel's address. Connect it in Cloudflare (Settings > Domains & Routes > Custom domain).
+  // The *.workers.dev address keeps working as a backup way into the panel.
+  "vars": { "APP_HOST": "painel.cutti.us" }
 }
