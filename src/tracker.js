@@ -17,7 +17,7 @@ export const NETWORKS = {
   buygoods: { name: "BuyGoods", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}&type={CONV_TYPE}" },
   digistore24: { name: "Digistore24", param: "cid", currency: "USD", query: "cid={cid}&amount={amount_affiliate}&txid={order_id}&currency={currency}" },
   maxweb: { name: "MaxWeb", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}" },
-  gurumedia: { name: "GuruMedia", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout}&txid={transaction_id}", check: true },
+  gurumedia: { name: "GuruMedia", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}" },
   smartadv: { name: "SmartADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout}&txid={transaction_id}", check: true },
   smashloud: { name: "SmashLoud", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout}&txid={transaction_id}", check: true },
   clickadv: { name: "ClickADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout}&txid={transaction_id}", check: true },

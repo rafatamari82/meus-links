@@ -274,7 +274,7 @@ const WHERE = {
   buygoods: "Profile → Postback Pixels → Add New. Vale para todas as ofertas.",
   digistore24: "Visão de afiliado → Conta → S2S Postback.",
   maxweb: "Menu → Postback Pixels → Add new. Vale para todas as ofertas.",
-  gurumedia: "No painel da GuruMedia, campo de postback global ou da oferta; o click ID vai em sub1.",
+  gurumedia: "No painel da GuruMedia, campo de postback (no mesmo lugar do postback que você já usa). O código do clique vai em sub1.",
   smartadv: "Postback global no painel da rede; peça os macros ao gerente se não achar.",
   smashloud: "Postback global no painel da rede; peça os macros ao gerente se não achar.",
   clickadv: "Postback global no painel da rede; peça os macros ao gerente se não achar.",

@@ -80,3 +80,8 @@ test("notification templates", () => {
   assert.equal(T.renderTemplate("Caiu {valor} {desconhecida}", v), "Caiu US$ 10,00 {desconhecida}");
   assert.equal(T.cleanTemplate("  ", "x"), "x");
 });
+
+test("GuruMedia postback with its real macros filled in", () => {
+  const p = T.parsePostback("gurumedia", { cid: "ctdddddddddd", amount: "45.00", txid: "GM77", currency: "usd" }, null);
+  assert.deepEqual([p.type, p.amount_cents, p.txid, p.currency, p.ids[0]], ["sale", 4500, "GM77", "USD", "ctdddddddddd"]);
+});
