@@ -33,6 +33,35 @@ export function googleUrl(keyword, country, kind = "web") {
   return `https://www.${c.domain}/search?${q}&uule=${encodeURIComponent(uule(c.loc)).replace(/%2B/g, "+")}`;
 }
 
+export const LANGS = { en: "English", es: "Español", pt: "Português", de: "Deutsch", fr: "Français", it: "Italiano" };
+
+/** Search URL for the simple form: Google or Bing, a country and a language. */
+export function searchUrl({ q, engine, country, lang, kind }) {
+  const c = COUNTRIES[country] || COUNTRIES.US;
+  const hl = LANGS[lang] ? lang : c.hl.slice(0, 2);
+  if (engine === "bing") {
+    return `https://www.bing.com/search?${new URLSearchParams({ q, cc: country.toLowerCase(), setlang: `${hl}-${country.toLowerCase()}`, mkt: `${hl}-${country}` })}`;
+  }
+  const url = new URL(googleUrl(q, country, kind === "videos" ? "videos" : "web"));
+  url.searchParams.set("hl", hl);
+  return url.toString().replace(/uule=w%2BCAIQ/, "uule=w+CAIQ");
+}
+
+/** /spy/go: opens the search in a new tab from the simple form. */
+export function spyGo(c) {
+  const p = c.url.searchParams;
+  const q = String(p.get("q") || "").trim().slice(0, 200);
+  if (!q) return c.redirect("/spy");
+  const country = COUNTRIES[p.get("country")] ? p.get("country") : "US";
+  const target = searchUrl({ q, engine: p.get("engine"), country, lang: p.get("lang"), kind: p.get("kind") });
+  // A page, not a redirect: the panel's CSP (form-action 'self') forbids a form redirecting to another site.
+  const e = (x) => String(x).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+  const body = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">
+<meta http-equiv="refresh" content="0;url=${e(target)}"><title>Abrindo a busca…</title></head>
+<body style="font-family:system-ui;padding:24px"><p>Abrindo a busca… <a href="${e(target)}" rel="noreferrer">Clique aqui se não abrir.</a></p></body></html>`;
+  return new Response(body, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Search-Target": target } });
+}
+
 export const youtubeUrl = (keyword) => `https://www.youtube.com/results?${new URLSearchParams({ search_query: keyword })}`;
 export const transparencyUrl = (domain, country) =>
   `https://adstransparency.google.com/?${new URLSearchParams({ region: country, domain })}`;
@@ -106,10 +135,36 @@ function spyView(c, { kws, checks, domains, kwError, kwValue = "", domError }) {
   const btn = (k, st, label, cur) => html`<button class="btn btn-xs ${cur === st ? "btn-primary" : "btn-secondary"}" type="submit" name="status" value="${st}" ${cur === st ? raw('aria-pressed="true"') : raw('aria-pressed="false"')}>${label}</button>`;
   return page({ ...c, section: "spy" }, "Espionar Google", html`
 <header class="page-head">
-  <div><h1 class="h-xl">Espionar Google</h1>
-  <p class="muted">Hoje: ${done} de ${kws.length} conferidas · rankeando em ${ranking}</p></div>
+  <div><h1 class="h-xl">Pesquisar em outro país</h1>
+  <p class="muted">Veja o Google como alguém de outro país vê.</p></div>
 </header>
 
+<section class="card pad search-card">
+  <form method="get" action="/spy/go" target="_blank" class="stack">
+    <div class="field">
+      <label for="sq">Palavra</label>
+      <input id="sq" name="q" type="search" required maxlength="200" placeholder="Ex.: sodapeak review" autocomplete="off">
+    </div>
+    <fieldset class="seg">
+      <legend>Buscador</legend>
+      <label><input type="radio" name="engine" value="google" checked><span>Google</span></label>
+      <label><input type="radio" name="engine" value="bing"><span>Bing</span></label>
+    </fieldset>
+    <div class="field-row">
+      <div class="field"><label for="s-country">País</label>${countrySelect("s-country")}</div>
+      <div class="field"><label for="s-lang">Idioma</label><select id="s-lang" name="lang">${Object.entries(LANGS).map(([k, v]) => html`<option value="${k}">${v}</option>`)}</select></div>
+    </div>
+    <fieldset class="seg">
+      <legend>Mostrar</legend>
+      <label><input type="radio" name="kind" value="web" checked><span>Tudo</span></label>
+      <label><input type="radio" name="kind" value="videos"><span>Só vídeos</span></label>
+    </fieldset>
+    <button class="btn btn-primary btn-block btn-lg" type="submit">Pesquisar</button>
+    <p class="hint">Abre numa aba nova, direto da sua internet (sem VPN), então não dá o erro 403. Os resultados e os vídeos saem como os do país escolhido; anúncios podem variar.</p>
+  </form>
+</section>
+
+<h2 class="h-lg section-title">Minhas palavras do dia <span class="muted small">· hoje ${done} de ${kws.length} conferidas, rankeando em ${ranking}</span></h2>
 <section class="card table-wrap">
   ${kws.length ? html`
   <table class="links-table spy-table">

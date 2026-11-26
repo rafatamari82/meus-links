@@ -576,12 +576,29 @@ class E2E(unittest.TestCase):
         row.get_by_role("button", name="Rankeando").click()
         row = p.locator("tr", has_text="sodapeak review")
         expect(row.get_by_role("button", name="Rankeando")).to_have_attribute("aria-pressed", "true")
-        expect(p.get_by_text("Hoje: 1 de 2 conferidas · rankeando em 1")).to_be_visible()
+        expect(p.get_by_text("hoje 1 de 2 conferidas, rankeando em 1")).to_be_visible()
         expect(row.locator(".dot-yes")).to_have_count(1)
         p.get_by_label("Site do concorrente").fill("https://concorrente.com/oferta")
         p.get_by_role("button", name="Adicionar").last.click()
         link = p.get_by_role("link", name="Ver anúncios")
         self.assertIn("region=US&domain=concorrente.com", link.get_attribute("href"))
+
+    def test_s02_simple_country_search(self):
+        p = self.page
+        p.goto(self.base + "/spy")
+        p.get_by_label("Palavra", exact=True).fill("sodapeak review")
+        p.locator("#s-country").select_option(label="Reino Unido")
+        p.locator("label", has_text="Só vídeos").click()
+        with p.expect_popup() as pop:
+            p.get_by_role("button", name="Pesquisar").click()
+        pop.value.close()
+        r = p.request.get(self.base + "/spy/go?q=sodapeak+review&engine=google&country=GB&lang=en&kind=videos")
+        self.assertEqual(r.status, 200)
+        loc = r.headers["x-search-target"]
+        self.assertTrue(loc.startswith("https://www.google.co.uk/search?q=sodapeak+review&gl=gb&hl=en"), loc)
+        self.assertIn("tbm=vid", loc)
+        bing = p.request.get(self.base + "/spy/go?q=x&engine=bing&country=US&lang=en").headers["x-search-target"]
+        self.assertIn("bing.com/search?q=x&cc=us", bing)
 
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
