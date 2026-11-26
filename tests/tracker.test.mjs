@@ -109,3 +109,12 @@ test("sale e-mail escapes what the networks send", async () => {
   assert.ok(!html.includes("<b>Soda"));
   assert.ok(text.includes("Produto: <b>Soda</b>"));
 });
+
+test("raw e-mail is valid MIME with encoded subject", async () => {
+  const { rawEmail } = await import("../src/tracker-routes.js");
+  const m = rawEmail({ from: "vendas@cutti.us", fromName: "Cutti", to: "a@b.com", subject: "💰 Venda!", text: "oi", html: "<p>oi</p>", domain: "cutti.us" });
+  assert.match(m, /^From: =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?= <vendas@cutti\.us>\r\n/);
+  assert.match(m, /\r\nSubject: =\?UTF-8\?B\?8J\+SsCBWZW5kYSE=\?=\r\n/);
+  assert.ok(m.includes("multipart/alternative"));
+  assert.ok(m.endsWith("--\r\n"));
+});

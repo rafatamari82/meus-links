@@ -57,7 +57,7 @@ function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
   ${nets.map((n) => sw("mute", "on", !s.notify_muted.includes(n), NETWORKS[n].name, html`<input type="hidden" name="network" value="${n}">`))}
   ${emailReady ? sw("email", "on", s.email_on, html`Aviso por e-mail<span class="hint">${emailTo}</span>`) : html`<div class="set-row"><span class="set-label">Aviso por e-mail<span class="hint">Falta ativar o envio de e-mail na Cloudflare</span></span></div>`}
   ${sw("refunds", "on", s.notify_refunds, "Avisar reembolsos")}
-  <form method="post" action="/integrations/notify-test" class="set-row">${csrfField(c)}
+  <form method="post" action="/integrations/notify-test" class="set-row">${csrfField(c)}<input type="hidden" name="back" value="/settings">
     <button class="set-link" type="submit">Testar aviso</button></form>
 </div>
 <p class="set-note">No iPhone, abra o Cutti pelo ícone da Tela de Início antes de ativar.</p>

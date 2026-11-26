@@ -177,7 +177,9 @@ export async function postback(c, key, network) {
 
   // Phone notification.
   if (!dup && !s.notify_muted.includes(network) && (p.type === "sale" || p.type === "upsell" || s.notify_refunds)) {
-    c.exec.waitUntil(saleMessage(c.db, s, network, p, click).then((m) => notify(c.db, s, m, c.env.__notifyFetch || fetch, { email: c.env.EMAIL, panel: `https://${c.panelHost()}` })).catch((e) => console.error("notify", e)));
+    c.exec.waitUntil(saleMessage(c.db, s, network, p, click).then((m) => notify(c.db, s, m, c.env.__notifyFetch || fetch, { email: c.env.EMAIL, emailTo: c.env.EMAIL_TO, panel: `https://${c.panelHost()}` }))
+      .then((r) => (r.errors.length ? logEvent(c.db, "avisos", "falha", r.errors.join("; "), "") : null))
+      .catch((e) => console.error("notify", e)));
   }
 
   // Tell NewsBreak about the sale, so its algorithm learns from it.
@@ -231,9 +233,9 @@ function messageFrom(s, vars, refund) {
 }
 
 /** Send to every channel that is set up. Returns a list of errors (empty when all went out). */
-export async function notify(db, s, m, fetcher = fetch, { email = null, panel = "" } = {}) {
+export async function notify(db, s, m, fetcher = fetch, { email = null, panel = "", emailTo = "" } = {}) {
   const jobs = [];
-  if (s.email_on && email) jobs.push(sendSaleEmail(email, m, panel).then(() => null));
+  if (s.email_on && email) jobs.push(sendSaleEmail(email, m, panel, emailTo).then(() => null).catch((e) => String(e?.message || e).slice(0, 300)));
   const subs = (await db.prepare("select * from push_subs").all()).results;
   if (subs.length) {
     const owner = await db.prepare("select email from users limit 1").first();
@@ -291,10 +293,59 @@ ${rows.map(([k, x], i) => `<tr><td style="padding:12px 16px;color:#5b5b63;${i ? 
   return { text, html };
 }
 
-async function sendSaleEmail(binding, m, panel) {
+const b64 = (str) => {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+};
+const wrap76 = (x) => x.replace(/.{1,76}/g, "$&\r\n");
+
+/** A plain RFC 5322 message (multipart text + html), for the raw EmailMessage API. */
+export function rawEmail({ from, fromName, to, subject, text, html, domain }) {
+  const boundary = `cutti-${crypto.randomUUID()}`;
+  return [
+    `From: =?UTF-8?B?${b64(fromName)}?= <${from}>`,
+    `To: <${to}>`,
+    `Subject: =?UTF-8?B?${b64(subject)}?=`,
+    `Date: ${new Date().toUTCString()}`,
+    `Message-ID: <${crypto.randomUUID()}@${domain}>`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    wrap76(b64(text)),
+    `--${boundary}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    wrap76(b64(html)),
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
+}
+
+async function sendSaleEmail(binding, m, panel, to) {
   const { text, html } = saleEmail(m, panel);
-  const from = { email: `vendas@${new URL(panel).hostname.replace(/^app\./, "")}`, name: "Cutti" };
-  await binding.send({ from, subject: m.title, text, html }); // "to" comes from the binding's destination_address
+  const domain = new URL(panel).hostname.replace(/^app\./, "");
+  const from = `vendas@${domain}`;
+  let first;
+  try {
+    await binding.send({ from: { email: from, name: "Cutti" }, to, subject: m.title, text, html });
+    return;
+  } catch (e) {
+    first = e;
+  }
+  // Older runtimes or Email Routing alone: send the raw message.
+  try {
+    const { EmailMessage } = await import("cloudflare:email");
+    await binding.send(new EmailMessage(from, to, rawEmail({ from, fromName: "Cutti", to, subject: m.title, text, html, domain })));
+  } catch (e) {
+    throw new Error(`e-mail: ${first?.code || ""} ${first?.message || first} / ${e?.code || ""} ${e?.message || e}`.trim());
+  }
 }
 
 async function telegramConnect(c, token) {
@@ -564,7 +615,7 @@ export async function integrationsPost(c, action) {
     }
   } else if (action === "notify-test") {
     const s = await getSettings(c.db);
-    const r = await notify(c.db, s, { ...messageFrom(s, T.SAMPLE_VARS, false), vars: T.SAMPLE_VARS }, c.env.__notifyFetch || fetch, { email: c.env.EMAIL, panel: `https://${c.panelHost()}` });
+    const r = await notify(c.db, s, { ...messageFrom(s, T.SAMPLE_VARS, false), vars: T.SAMPLE_VARS }, c.env.__notifyFetch || fetch, { email: c.env.EMAIL, emailTo: c.env.EMAIL_TO, panel: `https://${c.panelHost()}` });
     if (!r.sent) c.flash("error", "Nenhum aviso configurado ainda.");
     else if (r.errors.length) c.flash("error", `Não foi: ${r.errors.join("; ")}`);
     else c.flash("success", "Aviso de teste enviado. Olhe o celular.");
@@ -624,7 +675,7 @@ export async function integrationsPost(c, action) {
     await costUpsert(c.db, { date, source, campaign_key: name, campaign_name: name, cost_cents: cents, currency }, nowIso()).run();
     c.flash("success", "Gasto salvo.");
   }
-  return c.redirect("/integrations");
+  return c.redirect(f.get("back") === "/settings" ? "/settings" : "/integrations");
 }
 
 export async function deleteSale(c, id) {
