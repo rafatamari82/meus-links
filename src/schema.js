@@ -59,6 +59,9 @@ export const SCHEMA = [
     cost_cents integer not null default 0, currency text not null default 'BRL', clicks integer not null default 0,
     impressions integer not null default 0, conversions real not null default 0, updated_at text not null,
     primary key (date, campaign_key, dim, bucket))`,
+  `create table if not exists ip_blocks (
+    user_id text not null, ip text not null, note text, created_at text not null,
+    primary key (user_id, ip))`,
   `create table if not exists push_subs (
     id text primary key, endpoint text not null unique, p256dh text not null, auth text not null,
     label text, created_at text not null, last_ok_at text)`,

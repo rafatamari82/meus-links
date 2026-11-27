@@ -179,8 +179,9 @@ async function serveShort(c, slashtag) {
 
   let link = null;
   if (slashtag && !slashtag.includes("/")) {
-    link = await db.prepare("select * from links where domain_id = ? and slashtag_lower = ?")
-      .bind(domain.id, slashtag.toLowerCase()).first();
+    // The visitor's IP is checked against the owner's blocked IPs in the same query (no extra trip).
+    link = await db.prepare("select l.*, exists(select 1 from ip_blocks b where b.user_id = l.user_id and b.ip = ?) as ip_blocked from links l where l.domain_id = ? and l.slashtag_lower = ?")
+      .bind(c.req.headers.get("CF-Connecting-IP") || "", domain.id, slashtag.toLowerCase()).first();
   }
   if (!link) {
     if (domain.not_found_url) {
@@ -200,7 +201,9 @@ async function serveShort(c, slashtag) {
   const blockBot = kind === "bad" && domain.antibot !== "0";
   // "Barrar VPN" on this link: VPN/proxy networks see the same "not here" page as a blocked country.
   const blockVpn = !blockBot && link.block_vpn && kind !== "good" && core.isVpnNetwork(cfNet);
-  const allowed = core.geoAllows(link.geo_mode, link.geo_countries, country) && !blockVpn;
+  // An IP the owner blocked sees the same "Oi Curioso!" page (Google and ad reviewers are never blocked this way).
+  const blockIp = !blockBot && !blockVpn && link.ip_blocked && kind !== "good";
+  const allowed = core.geoAllows(link.geo_mode, link.geo_countries, country) && !blockVpn && !blockIp;
 
   if (c.req.method === "GET") {
     const purpose = c.req.headers.get("Purpose") || c.req.headers.get("Sec-Purpose") || "";
@@ -223,7 +226,7 @@ async function serveShort(c, slashtag) {
     } : {};
     const writes = [db.prepare(
       "insert into clicks (link_id, at, referrer_host, user_agent, is_bot, country, device, os, blocked, ip, city, region, asn, as_org) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, blockBot ? 2 : blockVpn ? 3 : allowed ? 0 : 1,
+    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, blockBot ? 2 : blockVpn ? 3 : blockIp ? 4 : allowed ? 0 : 1,
       rob.ip ?? null, rob.city ?? null, rob.region ?? null, rob.asn ?? null, rob.org ?? null)];
     if (!bot && allowed) {
       writes.push(db.prepare("update links set clicks = clicks + 1, last_click_at = ? where id = ?").bind(ts, link.id));
@@ -444,6 +447,24 @@ async function createLink(c) {
   }), 422);
 }
 
+// Block or unblock one IP for all of the owner's links.
+async function ipBlockPost(c) {
+  const f = await c.form();
+  const ip = String(f.get("ip") || "").trim().slice(0, 64);
+  const back = String(f.get("back") || "/settings");
+  const safeBack = /^\/(links\/[\w-]+|settings)$/.test(back) ? back : "/settings";
+  if (!/^[0-9a-fA-F:.]{3,64}$/.test(ip)) { c.flash("error", "IP inválido."); return c.redirect(safeBack); }
+  if (f.get("action") === "unblock") {
+    await c.db.prepare("delete from ip_blocks where user_id = ? and ip = ?").bind(c.user.id, ip).run();
+    c.flash("success", `IP ${ip} desbloqueado.`);
+  } else {
+    await c.db.prepare("insert or ignore into ip_blocks (user_id, ip, note, created_at) values (?,?,?,?)")
+      .bind(c.user.id, ip, String(f.get("note") || "").slice(0, 120) || null, now()).run();
+    c.flash("success", `IP ${ip} bloqueado em todos os seus links.`);
+  }
+  return c.redirect(safeBack);
+}
+
 async function editLink(c, id) {
   const link = await getLink(c, id);
   if (!link) return notFound(c);
@@ -509,9 +530,11 @@ async function linkStats(c, id) {
     "select at, ip, city, region, country, asn, as_org, user_agent, blocked from clicks where link_id = ? and (is_bot = 1 or blocked = 3) order by id desc limit 50",
   ).bind(id).all()).results;
   const blocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 1").bind(id).first()).n;
+  const ipBlockedHits = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and blocked = 4").bind(id).first()).n;
+  const myBlocks = new Set((await c.db.prepare("select ip from ip_blocks where user_id = ?").bind(c.user.id).all()).results.map((r) => r.ip));
   // People stopped by the country rule: when, from where, on what (no IP: these are people).
   const blockedList = (await c.db.prepare(
-    "select at, ip, city, region, country, as_org, device, os from clicks where link_id = ? and is_bot = 0 and blocked = 1 order by id desc limit 50",
+    "select at, ip, city, region, country, as_org, device, os, blocked from clicks where link_id = ? and is_bot = 0 and blocked in (1, 4) order by id desc limit 50",
   ).bind(id).all()).results;
   const breakdown = async (col) => (await c.db.prepare(
     `select coalesce(${col}, '') as k, count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 0 group by k order by n desc limit 10`,
@@ -521,7 +544,7 @@ async function linkStats(c, id) {
   const systems = (await breakdown("os")).map((r) => ({ label: r.k || "Desconhecido", n: r.n }));
   const last30 = days.reduce((a, [, n]) => a + n, 0);
   return c.respond(V.statsView(c.view(), {
-    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, blockedList, robotsBlocked, vpnBlocked, robots, last30, countries, devices, systems,
+    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, blockedList, ipBlockedHits, myBlocks, robotsBlocked, vpnBlocked, robots, last30, countries, devices, systems,
   }));
 }
 
@@ -672,6 +695,7 @@ const PANEL_ROUTES = [
   ["POST", /^\/platforms$/, TR.platformsPost],
   ["GET", /^\/platforms\/setup$/, TR.platformsSetupPage],
   ["POST", /^\/sales\/([\w-]+)\/delete$/, TR.deleteSale],
+  ["POST", /^\/ip-blocks$/, ipBlockPost],
   ["GET", /^\/settings$/, ST.settingsPage],
   ["POST", /^\/settings\/(currency|refunds|mute|rate|email|antibot)$/, ST.settingsPost],
   ["GET", /^\/settings\/password$/, (c) => ST.passwordPage(c)],

@@ -10,10 +10,11 @@ export async function settingsPage(c) {
   const s = ratesLater(c, await getSettings(c.db));
   const nets = Object.keys(NETWORKS).filter((n) => n !== "other"); // every network the panel supports
   const devices = (await c.db.prepare("select count(*) as n from push_subs").first()).n;
-  return c.respond(settingsView(c.view(), { s, nets, devices, email: c.user.email, emailReady: !!c.env.EMAIL, emailTo: c.env.EMAIL_TO || "" }));
+  const ipBlocks = (await c.db.prepare("select ip, created_at from ip_blocks where user_id = ? order by created_at desc").bind(c.user.id).all()).results;
+  return c.respond(settingsView(c.view(), { s, nets, devices, ipBlocks, email: c.user.email, emailReady: !!c.env.EMAIL, emailTo: c.env.EMAIL_TO || "" }));
 }
 
-function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
+function settingsView(c, { s, nets, devices, ipBlocks = [], email, emailReady, emailTo }) {
   const sw = (action, name, on, label, extra = "") => html`
     <form method="post" action="/settings/${action}" class="set-row">
       ${csrfField(c)}${extra}
@@ -50,6 +51,15 @@ function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
 <h2 class="set-title">Links</h2>
 <div class="set-group">
   ${sw("antibot", "on", s.antibot, html`Barrar robôs<span class="hint">Scripts e servidores ficam de fora. Google, NewsBreak e prévias de redes sociais passam sempre.</span>`)}
+</div>
+
+<h2 class="set-title">IPs bloqueados</h2>
+<div class="set-group">
+  ${ipBlocks.length ? ipBlocks.map((b) => html`<form method="post" action="/ip-blocks" class="set-row">${csrfField(c)}
+    <input type="hidden" name="ip" value="${b.ip}"><input type="hidden" name="action" value="unblock"><input type="hidden" name="back" value="/settings">
+    <span class="set-label"><span class="mono">${b.ip}</span><span class="hint">Bloqueado em ${fmtDateTime(b.created_at)}</span></span>
+    <button class="btn btn-secondary btn-sm" type="submit">Desbloquear</button></form>`)
+    : html`<div class="set-row"><span class="set-label">Nenhum IP bloqueado<span class="hint">Bloqueie pelo botão “Bloquear IP” nas estatísticas de um link.</span></span></div>`}
 </div>
 
 <h2 class="set-title">Notificações de venda</h2>

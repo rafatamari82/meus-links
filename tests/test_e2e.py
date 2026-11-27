@@ -412,10 +412,27 @@ class E2E(unittest.TestCase):
         self.assertEqual(self.clicks_for("geobloq"), 2)  # the blocked visit is not counted
         self.page.get_by_role("link", name="Ver estatísticas de geobloq").click()
         expect(self.page.get_by_text("1 acesso de país bloqueado foi barrado")).to_be_visible()
-        box = self.page.locator("section.robots", has_text="Acessos bloqueados por país")
+        box = self.page.locator("section.robots", has_text="Acessos bloqueados")
         expect(box.locator("tbody tr")).to_have_count(1)
         expect(box.locator("tbody tr")).to_contain_text("Brasil")
         expect(box.locator("td[data-label=IP]")).to_have_text(re.compile(r"127\.0\.0\.1|::1"))
+        # block that IP: now even an allowed country is stopped, on every link
+        self.page.once("dialog", lambda d: d.accept())
+        box.get_by_role("button", name="Bloquear IP").first.click()
+        expect(self.page.get_by_text(re.compile(r"bloqueado em todos os seus links"))).to_be_visible()
+        status, body = self.geo_hit("geobloq", "PT")
+        self.assertEqual(status, 403)
+        self.assertIn("mico.svg", body)
+        self.page.goto(self.base + "/links?q=geobloq")
+        self.page.get_by_role("link", name="Ver estatísticas de geobloq").click()
+        expect(self.page.get_by_text("1 acesso de IP bloqueado foi barrado.")).to_be_visible()
+        expect(self.page.locator("section.robots tbody tr", has_text="IP bloqueado")).to_have_count(1)
+        # unblock in Ajustes
+        self.page.goto(self.base + "/settings")
+        self.page.locator("form[action='/ip-blocks']").get_by_role("button", name="Desbloquear").click()
+        expect(self.page.get_by_text(re.compile(r"desbloqueado"))).to_be_visible()
+        expect(self.page.get_by_text("Nenhum IP bloqueado")).to_be_visible()
+        self.assertEqual(self.geo_hit("geobloq", "PT")[0], 302)
 
     def test_f06_allow_only(self):
         self.create("https://exemplo.com/geo2", "geolib")

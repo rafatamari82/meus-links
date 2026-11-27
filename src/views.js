@@ -296,9 +296,9 @@ export function linksView(c, { rows, total, q, domainFilter, domains, activeDoma
       <td data-label="Cliques" class="num"><a href="/links/${l.id}" aria-label="Estatísticas de ${l.slashtag}: ${l.clicks} cliques">${l.clicks}</a></td>
       <td data-label="Criado" class="nowrap">${fmtDate(l.created_at)}</td>
       <td class="actions-cell"><div class="actions">
-        <a class="btn btn-ghost btn-xs" href="/links/${l.id}" aria-label="Ver estatísticas de ${l.slashtag}">
+        <a class="btn btn-secondary btn-xs" href="/links/${l.id}" aria-label="Ver estatísticas de ${l.slashtag}">
           <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Estatísticas</a>
+          Ver estatísticas</a>
         <a class="btn btn-secondary btn-xs" href="/links/${l.id}/edit" aria-label="Editar ${l.slashtag}">Editar</a>
         <form method="post" action="/links/${l.id}/delete" data-confirm="Apagar ${l.domain_name}/${l.slashtag}? Quem clicar nele vai ver “link não encontrado”.">
           ${csrfField(c)}
@@ -373,7 +373,7 @@ function breakdownCard(title, rows, total) {
 </section>`;
 }
 
-export function statsView(c, { link, days, peak, refs, bots, blocked = 0, blockedList = [], robotsBlocked = 0, vpnBlocked = 0, robots = [], last30, countries = [], devices = [], systems = [] }) {
+export function statsView(c, { link, days, peak, refs, bots, blocked = 0, blockedList = [], ipBlockedHits = 0, myBlocks = new Set(), robotsBlocked = 0, vpnBlocked = 0, robots = [], last30, countries = [], devices = [], systems = [] }) {
   const su = `${c.scheme}://${link.domain_name}/${link.slashtag}`;
   const bars = days.map(([label, n], i) => {
     const h = n ? (n / peak) * 110 : 0;
@@ -412,27 +412,30 @@ export function statsView(c, { link, days, peak, refs, bots, blocked = 0, blocke
   ${refs.length ? html`<table class="simple"><thead><tr><th scope="col">Origem</th><th scope="col" class="num">Cliques</th></tr></thead>
   <tbody>${refs.map((r) => html`<tr><td>${r.ref}</td><td class="num">${r.n}</td></tr>`)}</tbody></table>` : html`<p class="muted">Nada ainda.</p>`}
   ${blocked ? html`<p class="hint">${blocked} ${blocked === 1 ? "acesso de país bloqueado foi barrado e não entrou" : "acessos de países bloqueados foram barrados e não entraram"} na contagem.</p>` : ""}
+  ${ipBlockedHits ? html`<p class="hint">${ipBlockedHits} ${ipBlockedHits === 1 ? "acesso de IP bloqueado foi barrado" : "acessos de IPs bloqueados foram barrados"}.</p>` : ""}
   ${vpnBlocked ? html`<p class="hint">${vpnBlocked} ${vpnBlocked === 1 ? "acesso por VPN foi barrado" : "acessos por VPN foram barrados"}.</p>` : ""}
   ${robotsBlocked ? html`<p class="hint">${robotsBlocked} ${robotsBlocked === 1 ? "acesso de robô foi barrado" : "acessos de robôs foram barrados"} pelo filtro anti-robô.</p>` : ""}
   ${bots ? html`<p class="hint">${bots} ${bots === 1 ? "acesso de robôs e prévias de redes sociais não entrou" : "acessos de robôs e prévias de redes sociais não entraram"} na contagem.</p>` : ""}
 </section>
 ${blockedList.length ? html`<section class="card table-wrap robots">
-  <h2 class="h-md pad-x">Acessos bloqueados por país</h2>
-  <p class="hint pad-x">Quem abriu o link de um país bloqueado e viu a página “Oi Curioso!”. Não conta como clique.</p>
-  <table class="simple"><thead><tr><th scope="col">Quando</th><th scope="col">IP</th><th scope="col">Local</th><th scope="col">Internet</th><th scope="col">Aparelho</th></tr></thead>
+  <h2 class="h-md pad-x">Acessos bloqueados</h2>
+  <p class="hint pad-x">Quem abriu o link de um país ou IP bloqueado e viu a página “Oi Curioso!”. Não conta como clique.</p>
+  <table class="simple"><thead><tr><th scope="col">Quando</th><th scope="col">IP</th><th scope="col">Local</th><th scope="col">Internet</th><th scope="col">Aparelho</th><th scope="col">Motivo</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
   <tbody>${blockedList.map((r) => html`<tr>
     <td data-label="Quando">${fmtDateTime(r.at)}</td>
     <td data-label="IP" class="mono">${r.ip || "—"}</td>
     <td data-label="Local">${[r.city, r.region, r.country ? countryName(r.country) : "País desconhecido"].filter(Boolean).join(", ")}</td>
     <td data-label="Internet">${r.as_org || "—"}</td>
     <td data-label="Aparelho">${[r.device, r.os].filter(Boolean).join(" · ") || "—"}</td>
+    <td data-label="Motivo">${r.blocked === 4 ? html`<span class="badge badge-warning">IP bloqueado</span>` : html`<span class="badge">País</span>`}</td>
+    <td class="actions-cell">${ipButton(c, r.ip, myBlocks, link.id)}</td>
   </tr>`)}</tbody></table>
   <p class="hint pad-x">A cidade vem da localização aproximada do IP e pode errar por algumas dezenas de km. Os acessos de antes desta mudança aparecem sem IP e cidade.</p>
 </section>` : ""}
 ${robots.length ? html`<section class="card table-wrap robots">
   <h2 class="h-md pad-x">Acessos de robôs e VPN</h2>
   <p class="hint pad-x">Os últimos ${robots.length}. O IP e o local são guardados só de robôs, VPNs e acessos bloqueados; de quem passa, nunca.</p>
-  <table class="simple robot-table"><thead><tr><th scope="col">Quando</th><th scope="col">IP</th><th scope="col">Local</th><th scope="col">Rede</th><th scope="col">Situação</th><th scope="col">Navegador</th></tr></thead>
+  <table class="simple robot-table"><thead><tr><th scope="col">Quando</th><th scope="col">IP</th><th scope="col">Local</th><th scope="col">Rede</th><th scope="col">Situação</th><th scope="col">Navegador</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
   <tbody>${robots.map((r) => html`<tr>
     <td data-label="Quando">${fmtDateTime(r.at)}</td>
     <td data-label="IP" class="mono">${r.ip || "—"}</td>
@@ -440,6 +443,7 @@ ${robots.length ? html`<section class="card table-wrap robots">
     <td data-label="Rede">${r.as_org || "—"}${r.asn ? html` <span class="hint">AS${r.asn}</span>` : ""}</td>
     <td data-label="Situação">${r.blocked === 2 ? html`<span class="badge badge-warning">Barrado</span>` : r.blocked === 3 ? html`<span class="badge badge-warning">VPN barrada</span>` : html`<span class="badge">Liberado</span>`}</td>
     <td data-label="Navegador" class="ua-cell" title="${r.user_agent || ""}">${(r.user_agent || "(vazio)").slice(0, 60)}${(r.user_agent || "").length > 60 ? "…" : ""}</td>
+    <td class="actions-cell">${ipButton(c, r.ip, myBlocks, link.id)}</td>
   </tr>`)}</tbody></table>
   <p class="hint pad-x">Liberado: robôs do Google, NewsBreak e prévias de redes sociais (ou o filtro estava desligado). Não contam como clique.</p>
 </section>` : ""}`);
@@ -497,6 +501,17 @@ export function domainsView(c, { domains, counts, error, value, panelHost }) {
   </form>
   <p class="hint">Painel: ${panelHost}</p>
 </section>`);
+}
+
+// "Bloquear este IP" / "Desbloquear" button for a row of the access tables.
+function ipButton(c, ip, blocks, linkId) {
+  if (!ip || ip === "local") return "";
+  const on = blocks.has(ip);
+  return html`<form method="post" action="/ip-blocks" ${on ? "" : raw('data-confirm="Bloquear este IP em todos os seus links? Em internet de celular, o mesmo IP pode ser de várias pessoas."')}>
+    ${csrfField(c)}<input type="hidden" name="ip" value="${ip}"><input type="hidden" name="back" value="/links/${linkId}">
+    ${on ? html`<input type="hidden" name="action" value="unblock"><button class="btn btn-ghost btn-xs" type="submit">Desbloquear</button>`
+      : html`<button class="btn btn-secondary btn-xs" type="submit">Bloquear IP</button>`}
+  </form>`;
 }
 
 export function geoBlocked(assetVersion) {
