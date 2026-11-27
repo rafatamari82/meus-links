@@ -40,6 +40,8 @@ export async function getSettings(db) {
     tg_name: s.tg_name || "",
     notify_refunds: s.notify_refunds !== "0",
     antibot: s.antibot !== "0",
+    // The platforms shown on the dashboard; null until chosen (then the networks of tracked links are used).
+    platforms: s.platforms == null ? null : s.platforms.split(",").filter((n) => T.NETWORKS[n] && n !== "other"),
     notify_muted: (s.notify_muted || "").split(",").filter(Boolean),
     rate_auto: s.rate_auto !== "0",
     rate_at: s.rate_at || "",
@@ -666,8 +668,8 @@ export async function resultsPage(c) {
   const hasAny = hasAnyRows[0]?.n || 0;
   // Per network, for the cards: networks of tracked links plus any that sent a sale in the period.
   const nets = new Map();
-  for (const r of linkNets) {
-    nets.set(r.network, { network: r.network, revenue: 0, sales: 0, refunds: 0 });
+  for (const k of s.platforms ?? linkNets.map((r) => r.network)) {
+    nets.set(k, { network: k, revenue: 0, sales: 0, refunds: 0 });
   }
   for (const r of netRows) {
     if (!nets.has(r.network)) nets.set(r.network, { network: r.network, revenue: 0, sales: 0, refunds: 0 });
@@ -842,4 +844,37 @@ export async function deleteSale(c, id) {
   await c.db.prepare("delete from tk_conversions where id = ?").bind(id).run();
   c.flash("success", "Venda removida.");
   return c.redirect("/sales");
+}
+
+// ---------------------------------------------------------------- platforms (pick the networks shown on the dashboard)
+
+async function currentPlatforms(c, s) {
+  if (s.platforms) return s.platforms;
+  const rows = (await c.db.prepare("select distinct network from links where track = 1 and network is not null").all()).results;
+  return rows.map((r) => r.network).filter((n) => T.NETWORKS[n] && n !== "other");
+}
+
+export async function platformsPage(c) {
+  const s = await getSettings(c.db);
+  return c.respond(TV.platformsView(c.view(), { selected: await currentPlatforms(c, s) }));
+}
+
+export async function platformsPost(c) {
+  const f = await c.form();
+  const picked = [...new Set(f.getAll("net").map(String))].filter((n) => T.NETWORKS[n] && n !== "other");
+  const before = await currentPlatforms(c, await getSettings(c.db));
+  await setSetting(c.db, "platforms", picked.join(","));
+  const added = picked.filter((n) => !before.includes(n));
+  if (!picked.length) {
+    c.flash("success", "Nenhuma plataforma no painel.");
+    return c.redirect("/results");
+  }
+  return c.redirect(`/platforms/setup${added.length ? `?new=${added.join(",")}` : ""}`);
+}
+
+export async function platformsSetupPage(c) {
+  const s = await getSettings(c.db);
+  const selected = await currentPlatforms(c, s);
+  const added = String(c.url.searchParams.get("new") || "").split(",").filter((n) => selected.includes(n));
+  return c.respond(TV.platformsSetupView(c.view(), { s, base: `https://${c.panelHost()}`, selected, added }));
 }

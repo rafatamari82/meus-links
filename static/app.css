@@ -445,3 +445,24 @@ a.set-row:hover { background: var(--color-surface); }
   .sale-facts > div:nth-child(-n+2) { border-top: 0; }
   .sale-facts > div:nth-child(odd) { border-right: 1px solid var(--color-border); }
 }
+
+/* Adicionar plataforma */
+.add-platform { display: flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: 56px; border: 1.5px dashed var(--color-accent); border-radius: 16px; background: var(--color-accent-soft); color: var(--color-accent); font-weight: 600; font-size: var(--text-base); text-decoration: none; }
+.add-platform span { font-size: 24px; line-height: 1; font-weight: 400; }
+.row-between { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+.plat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3); }
+.plat-tile { position: relative; display: flex; align-items: center; justify-content: center; min-height: 88px; padding: var(--space-3); background: var(--color-bg); border: 1.5px solid var(--color-border); border-radius: 14px; cursor: pointer; text-align: center; }
+.plat-tile input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.plat-name { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; font-size: var(--text-base); color: var(--color-text); }
+.plat-check { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; display: none; place-items: center; background: var(--color-accent); color: #fff; font-size: 13px; font-weight: 700; }
+.plat-tile:has(input:checked) { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.plat-tile:has(input:checked) .plat-check { display: grid; }
+.plat-tile:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.plat-form .hint { margin-top: var(--space-4); }
+.plat-bar { margin-top: var(--space-5); max-width: 420px; }
+.plat-setup .h-md { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+@media (max-width: 760px) {
+  .plat-grid { grid-template-columns: 1fr 1fr; }
+  .plat-bar { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); max-width: none; padding-top: var(--space-2); }
+  .plat-next, .plat-bar .btn { min-height: 52px; border-radius: 999px; font-size: var(--text-base); }
+}

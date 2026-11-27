@@ -119,6 +119,7 @@ ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) =
     <span class="net-sub">${n.sales} ${n.sales === 1 ? "venda" : "vendas"} · ${n.refunds} reembolso(s)</span>
     <svg class="net-chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
   </a>`)}</div>` : ""}
+<a class="add-platform mobile-only" href="/platforms"><span aria-hidden="true">+</span> adicionar plataforma</a>
 
 <div class="mgrid mgrid-main desktop-only">
   <div class="mcard mcard-hero"><p class="mcard-label">Faturamento líquido</p><p class="mcard-value">${m(tot.revenue)}</p><p class="mcard-sub">${tot.sales} ${tot.sales === 1 ? "venda" : "vendas"}${tot.refunds ? ` · ${tot.refunds} reembolso(s)` : ""}</p></div>
@@ -139,7 +140,7 @@ ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) =
     : html`<p class="muted">Nenhuma venda por aqui.</p>`}
     </section>
     <section class="card pad">
-      <h2 class="h-md">Vendas por plataforma</h2>
+      <div class="row-between"><h2 class="h-md">Vendas por plataforma</h2><a class="small" href="/platforms">+ adicionar plataforma</a></div>
       ${networks.some((n) => n.sales || n.refunds) ? html`<ul class="rank">${networks.filter((n) => n.sales || n.refunds).map((n) => html`<li>
         <a href="/sales?${new URLSearchParams({ ...base, network: n.network })}" class="rank-row">
           <span class="rank-name">${NETWORKS[n.network]?.name || n.network}</span><span class="rank-val">${m(n.revenue)}</span></a>
@@ -219,6 +220,45 @@ function audienceSection(audience, m) {
   <div class="aud-grid">${table("Idade", audience.age, AGE_LABEL)}${table("Sexo", audience.gender, GENDER_LABEL)}</div>`
     : html`<p class="muted">Ainda sem dados. Copie de novo o script em <a href="/tracking">Trackeamento</a> e cole no Google Ads por cima do antigo: a versão nova também manda idade e sexo.</p>`}
 </section>`;
+}
+
+const netMark = (name) => html`<span class="net-mark" aria-hidden="true">${name.slice(0, 1).toUpperCase()}</span>`;
+
+export function platformsView(c, { selected }) {
+  const nets = Object.entries(NETWORKS).filter(([k]) => k !== "other");
+  return page({ ...c, section: "results" }, "Adicionar plataforma", html`
+<nav class="crumbs"><a href="/results">‹ Dashboard</a></nav>
+<header class="page-head"><div><h1 class="h-xl">Adicionar plataforma</h1><p class="muted">Toque nas plataformas que você usa. Elas aparecem no Dashboard e ganham o postback pronto.</p></div></header>
+<form method="post" action="/platforms" class="plat-form">
+  ${csrfField(c)}
+  <div class="plat-grid">${nets.map(([k, n]) => html`
+    <label class="plat-tile">
+      <input type="checkbox" name="net" value="${k}" ${selected.includes(k) ? raw("checked") : ""}>
+      <span class="plat-name">${netMark(n.name)}${n.name}</span>
+      <span class="plat-check" aria-hidden="true">✓</span>
+    </label>`)}</div>
+  <p class="hint">Usa outra plataforma, como Braip, Monetizze ou Perfect Pay? Mande o postback dela que ela entra nesta lista.</p>
+  <div class="plat-bar"><button class="btn btn-primary btn-block plat-next" type="submit">Avançar</button></div>
+</form>`);
+}
+
+export function platformsSetupView(c, { s, base, selected, added }) {
+  const pb = (k) => {
+    const n = NETWORKS[k];
+    return n.json ? `${base}/pb/${s.key}/${k}` : `${base}/pb/${s.key}/${k}?${n.query}`;
+  };
+  const show = added.length ? added : selected;
+  return page({ ...c, section: "results" }, "Configurar plataformas", html`
+<nav class="crumbs"><a href="/platforms">‹ Plataformas</a></nav>
+<header class="page-head"><div><h1 class="h-xl">${added.length ? "Falta só o postback" : "Postbacks das plataformas"}</h1>
+  <p class="muted">Copie a URL de cada plataforma e cole no painel dela. É assim que a venda chega no Cutti.</p></div></header>
+${show.map((k) => html`<section class="card pad plat-setup">
+  <h2 class="h-md">${netMark(NETWORKS[k].name)} ${NETWORKS[k].name}</h2>
+  <div class="copy-row"><input value="${pb(k)}" readonly aria-label="URL de postback ${NETWORKS[k].name}" spellcheck="false"><button class="btn btn-secondary btn-sm" type="button" data-copy="${pb(k)}">Copiar</button></div>
+  <p class="hint">${WHERE[k] || ""}</p>
+  <p class="hint">No link do anúncio: abra o link no Encurtador, ligue <strong>Rastrear vendas</strong> e escolha ${NETWORKS[k].name}.</p>
+</section>`)}
+<div class="plat-bar"><a class="btn btn-primary btn-block" href="/results">Concluir</a></div>`);
 }
 
 export function salesView(c, { s, range, sales, events, network = "", days = {}, today = "" }) {
