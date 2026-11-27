@@ -224,11 +224,11 @@ function audienceSection(audience, m) {
 
 const netMark = (name) => html`<span class="net-mark" aria-hidden="true">${name.slice(0, 1).toUpperCase()}</span>`;
 // Official logos sent by the owner (static/net-<key>.png); the others show an initial and the name.
-const NET_LOGOS = new Set(["hotmart", "kiwify", "clickbank", "buygoods", "digistore24", "maxweb", "gurumedia", "smartadv"]);
+const NET_LOGOS = new Set(["hotmart", "kiwify", "clickbank", "buygoods", "digistore24", "maxweb", "gurumedia", "smartadv", "smashloud", "clickadv", "medisscalers"]);
 const netBrand = (k, v) => {
   const name = NETWORKS[k]?.name || k;
   return NET_LOGOS.has(k)
-    ? html`<img class="net-logo" src="/static/net-${k}.png?v=${v}" alt="${name}">`
+    ? html`<img class="net-logo nl-${k}" src="/static/net-${k}.png?v=${v}" alt="${name}">`
     : html`${netMark(name)}<span>${name}</span>`;
 };
 
