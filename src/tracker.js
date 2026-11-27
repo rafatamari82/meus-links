@@ -13,9 +13,9 @@ export function newClickId() {
 // Where each network carries the sub-ID, and the postback template with that network's macros.
 // Macros differ per network; the click ID is also found by its format, so a wrong name still works.
 export const NETWORKS = {
-  clickbank: { name: "ClickBank", param: "tid", currency: "USD", query: "cid={tid}&amount={affiliate_earnings}&txid={order_id}" },
+  clickbank: { name: "ClickBank", param: "tid", currency: "USD", query: "cid={tid}&amount={affiliate_earnings}&txid={order_id}&country={country}" },
   buygoods: { name: "BuyGoods", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}&type={CONV_TYPE}&product={PRODUCT_CODENAME}" },
-  digistore24: { name: "Digistore24", param: "cid", currency: "USD", query: "cid={cid}&amount={amount_affiliate}&txid={order_id}&currency={currency}&product={product_name}" },
+  digistore24: { name: "Digistore24", param: "cid", currency: "USD", query: "cid={cid}&amount={amount_affiliate}&txid={order_id}&currency={currency}&product={product_name}&country={country}" },
   maxweb: { name: "MaxWeb", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}&product={PRODUCT_CODENAME}" },
   gurumedia: { name: "GuruMedia", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&product={offer_name}&country={geo_country_code}" },
   smartadv: { name: "SmartADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&product={offer_name}&country={geo_country_code}" },

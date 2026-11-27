@@ -140,3 +140,9 @@ test("Everflow-style networks send the buyer's country", () => {
   assert.equal(T.parsePostback("gurumedia", { cid: "ctaaaaaaaaaa", amount: "30", country: "CA" }).country, "CA");
   assert.equal(T.parsePostback("smartadv", { cid: "ctaaaaaaaaaa", amount: "30", country: "{geo_country_code}" }).country, null);
 });
+
+test("ClickBank and Digistore24 send the buyer's country", () => {
+  assert.match(T.NETWORKS.clickbank.query, /country=\{country\}/);
+  assert.match(T.NETWORKS.digistore24.query, /country=\{country\}/);
+  assert.equal(T.parsePostback("clickbank", { cid: "ctaaaaaaaaaa", amount: "50", txid: "R1", country: "US" }).country, "US");
+});
