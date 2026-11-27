@@ -13,7 +13,13 @@ class Stmt {
   }
   async all() { return { results: this._s().all(...this.args).map((r) => ({ ...r })), success: true }; }
   async run() { const r = this._s().run(...this.args); return { success: true, meta: { changes: Number(r.changes) } }; }
-  _runSync() { const r = this._s().run(...this.args); return { success: true, meta: { changes: Number(r.changes) } }; }
+  _runSync() {
+    // Like real D1: statements that return rows give them back in a batch too.
+    const st = this._s();
+    if (st.columns().length) return { results: st.all(...this.args).map((r) => ({ ...r })), success: true, meta: { changes: 0 } };
+    const r = st.run(...this.args);
+    return { results: [], success: true, meta: { changes: Number(r.changes) } };
+  }
 }
 
 export class D1Shim {

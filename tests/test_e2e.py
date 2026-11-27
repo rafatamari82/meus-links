@@ -721,6 +721,29 @@ class E2E(unittest.TestCase):
         p.goto(self.base + "/tracking")
         self.assertIn("want_conversions: true", p.get_by_label("Script do Cutti").input_value())
 
+    def test_t12_touch_prefetch_opens_right_page(self):
+        p = self.page
+        seen = []
+        handler = lambda r: r.headers.get("x-cutti-prefetch") and seen.append(r.url)
+        self.ctx.on("request", handler)
+        try:
+            p.goto(self.base + "/results")
+            p.wait_for_function("navigator.serviceWorker.ready.then(() => true)")
+            p.reload()  # the worker controls the page from the second load
+            p.wait_for_function("!!navigator.serviceWorker.controller")
+            link = p.locator(".sidebar nav").get_by_role("link", name="Vendas")
+            link.dispatch_event("mousedown")
+            p.wait_for_timeout(400)
+            link.click()
+            expect(p).to_have_url(re.compile(r"/sales$"))
+            expect(p.get_by_role("heading", name="Vendas", exact=True)).to_be_visible()
+            self.assertTrue(any(u.endswith("/sales") for u in seen), seen)
+            # Back on Resumo, its filters still work (the page came whole, scripts included).
+            p.locator(".sidebar nav").get_by_role("link", name="Resumo").click()
+            expect(p).to_have_url(re.compile(r"/results$"))
+        finally:
+            self.ctx.remove_listener("request", handler)
+
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
                                      storage_state=self.ctx.storage_state()).new_page()

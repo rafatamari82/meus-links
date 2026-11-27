@@ -105,11 +105,8 @@ export async function freshRates(c, s, { force = false } = {}) {
       const { usd, eur } = await read(fetcher, s);
       if (!okRate(usd) || !okRate(eur)) throw new Error("valor fora do esperado");
       const at = new Date().toISOString();
-      await setSetting(c.db, "usd_brl", usd.toFixed(4));
-      await setSetting(c.db, "eur_brl", eur.toFixed(4));
-      await setSetting(c.db, "rate_at", at);
-      await setSetting(c.db, "rate_src", name);
-      await setSetting(c.db, "rate_err", errors.join("; "));
+      await c.db.batch([["usd_brl", usd.toFixed(4)], ["eur_brl", eur.toFixed(4)], ["rate_at", at], ["rate_src", name], ["rate_err", errors.join("; ")]]
+        .map(([k, v]) => settingStmt(c.db, k, v)));
       return { ...s, usd_brl: usd, eur_brl: eur, rate_at: at, rate_src: name, rate_err: errors.join("; ") };
     } catch (e) {
       errors.push(`${name}: ${e?.name === "TimeoutError" ? "demorou" : e?.message || e}`);
@@ -121,9 +118,16 @@ export async function freshRates(c, s, { force = false } = {}) {
   return { ...s, rate_err: errors.join("; ") };
 }
 
+const settingStmt = (db, key, value) =>
+  db.prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value").bind(`tk_${key}`, String(value));
 export async function setSetting(db, key, value) {
-  await db.prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value")
-    .bind(`tk_${key}`, String(value)).run();
+  await settingStmt(db, key, value).run();
+}
+
+/** Pages never wait for the quote: they show the last one and refresh it in the background for the next visit. */
+export function ratesLater(c, s) {
+  if (c.exec?.waitUntil) c.exec.waitUntil(freshRates(c, s).catch((e) => console.error("cotação", e)));
+  return s;
 }
 
 // ---------------------------------------------------------------- the click
@@ -528,7 +532,8 @@ const sumRev = (type, cents) => (type === "refund" || type === "chargeback" ? -c
 
 export async function resultsPage(c) {
   const force = c.url.searchParams.get("refresh") === "1";
-  const s = await freshRates(c, await getSettings(c.db), { force });
+  const s0 = await getSettings(c.db);
+  const s = force ? await freshRates(c, s0, { force }) : ratesLater(c, s0);
   const range = readRange(c.url.searchParams);
   const byAd = c.url.searchParams.get("by") === "ad";
   const srcFilter = c.url.searchParams.get("source") || "";
@@ -540,22 +545,46 @@ export async function resultsPage(c) {
   const db = c.db;
   const adCol = byAd ? ", coalesce(ad, '') as ad" : ", '' as ad";
   const adGroup = byAd ? ", ad" : "";
-  const clicks = (await db.prepare(
+  const srcSql = srcFilter ? " and coalesce(k.source, 'none') = ?" : "";
+  // Every query goes to the database in one round trip (it is far away, so each trip costs).
+  const [clicks, convs, costs, nameRows, dRows, cRows, hasAnyRows, netRows, linkNets, pRows, prodNameRows, srcRows] = (await db.batch([
+    db.prepare(
     `select source, coalesce(campaign, '') as campaign${adCol}, count(*) as n from tk_clicks
      where at >= ? and at < ?${netFilter ? " and link_id in (select id from links where network = ?)" : ""} group by source, campaign${adGroup}`,
-  ).bind(range.start, range.end, ...(netFilter ? [netFilter] : [])).all()).results;
-  const convs = (await db.prepare(
+  ).bind(range.start, range.end, ...(netFilter ? [netFilter] : [])),
+    db.prepare(
     `select coalesce(k.source, 'none') as source, coalesce(k.campaign, '') as campaign${byAd ? ", coalesce(k.ad, '') as ad" : ", '' as ad"},
             v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
      from tk_conversions v left join tk_clicks k on k.id = v.click_id
      where v.at >= ? and v.at < ?${vSql} group by 1, 2, 3, v.type, v.currency`,
-  ).bind(range.start, range.end, ...vArgs).all()).results;
-  const costs = (await db.prepare(
+  ).bind(range.start, range.end, ...vArgs),
+    db.prepare(
     "select source, campaign_key as campaign, currency, sum(cost_cents) as cents, sum(clicks) as clicks from tk_costs where date >= ? and date <= ? group by source, campaign_key, currency",
-  ).bind(range.from, range.to).all()).results;
-  const names = Object.fromEntries((await db.prepare(
-    "select source || '|' || campaign_key as k, max(campaign_name) as name from tk_costs group by source, campaign_key",
-  ).all()).results.map((r) => [r.k, r.name]));
+  ).bind(range.from, range.to),
+    db.prepare("select source || '|' || campaign_key as k, max(campaign_name) as name from tk_costs group by source, campaign_key"),
+    db.prepare(
+    `select substr(datetime(v.at, '-${SP_OFFSET_H} hours'), 1, 10) as d, v.type, v.currency, sum(v.amount_cents) as cents
+     from tk_conversions v left join tk_clicks k on k.id = v.click_id where v.at >= ? and v.at < ?${srcSql}${vSql} group by 1, 2, 3`,
+    ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs),
+    db.prepare(
+    `select date as d, currency, sum(cost_cents) as cents from tk_costs where date >= ? and date <= ?${srcFilter ? " and source = ?" : ""} group by 1, 2`,
+    ).bind(range.from, range.to, ...(srcFilter ? [srcFilter] : [])),
+    db.prepare("select (select count(*) from tk_clicks) + (select count(*) from tk_conversions) + (select count(*) from tk_costs) as n"),
+    db.prepare(
+    `select v.network, v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
+     from tk_conversions v left join tk_clicks k on k.id = v.click_id
+     where v.at >= ? and v.at < ?${srcSql}${vSql} group by v.network, v.type, v.currency`,
+    ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs),
+    db.prepare("select distinct network from links where track = 1 and network is not null"),
+    db.prepare(
+    `select coalesce(v.product, '') as product, v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
+     from tk_conversions v left join tk_clicks k on k.id = v.click_id
+     where v.at >= ? and v.at < ?${srcSql}${vSql} group by 1, v.type, v.currency`,
+    ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs),
+    db.prepare("select distinct product from tk_conversions where product is not null order by product limit 200"),
+    db.prepare("select distinct source from tk_clicks"),
+  ])).map((r) => r.results || []);
+  const names = Object.fromEntries(nameRows.map((r) => [r.k, r.name]));
 
   const rows = new Map();
   const row = (source, campaign, ad) => {
@@ -603,27 +632,14 @@ export async function resultsPage(c) {
   for (let d = range.from; d <= range.to && days.length < 92; d = addDays(d, 1)) days.push(d);
   const dayRev = Object.fromEntries(days.map((d) => [d, 0]));
   const dayCost = Object.fromEntries(days.map((d) => [d, 0]));
-  const srcSql = srcFilter ? " and coalesce(k.source, 'none') = ?" : "";
-  const dRows = (await db.prepare(
-    `select substr(datetime(v.at, '-${SP_OFFSET_H} hours'), 1, 10) as d, v.type, v.currency, sum(v.amount_cents) as cents
-     from tk_conversions v left join tk_clicks k on k.id = v.click_id where v.at >= ? and v.at < ?${srcSql}${vSql} group by 1, 2, 3`,
-  ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs).all()).results;
   for (const r of dRows) if (r.d in dayRev) dayRev[r.d] += sumRev(r.type, conv(r.cents, r.currency));
-  const cRows = (await db.prepare(
-    `select date as d, currency, sum(cost_cents) as cents from tk_costs where date >= ? and date <= ?${srcFilter ? " and source = ?" : ""} group by 1, 2`,
-  ).bind(range.from, range.to, ...(srcFilter ? [srcFilter] : [])).all()).results;
   for (const r of cRows) if (r.d in dayCost) dayCost[r.d] += conv(r.cents, r.currency);
   const series = days.map((d) => ({ d, rev: dayRev[d], cost: dayCost[d] }));
 
-  const hasAny = (await db.prepare("select (select count(*) from tk_clicks) + (select count(*) from tk_conversions) + (select count(*) from tk_costs) as n").first()).n;
+  const hasAny = hasAnyRows[0]?.n || 0;
   // Per network, for the cards: networks of tracked links plus any that sent a sale in the period.
-  const netRows = (await db.prepare(
-    `select v.network, v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
-     from tk_conversions v left join tk_clicks k on k.id = v.click_id
-     where v.at >= ? and v.at < ?${srcSql}${vSql} group by v.network, v.type, v.currency`,
-  ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs).all()).results;
   const nets = new Map();
-  for (const r of (await db.prepare("select distinct network from links where track = 1 and network is not null").all()).results) {
+  for (const r of linkNets) {
     nets.set(r.network, { network: r.network, revenue: 0, sales: 0, refunds: 0 });
   }
   for (const r of netRows) {
@@ -635,11 +651,6 @@ export async function resultsPage(c) {
   const networks = [...nets.values()].filter((n) => !netFilter || n.network === netFilter).sort((a, b) => b.revenue - a.revenue || b.sales - a.sales);
 
   // Per product, plus money totals for refunds and chargebacks.
-  const pRows = (await db.prepare(
-    `select coalesce(v.product, '') as product, v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
-     from tk_conversions v left join tk_clicks k on k.id = v.click_id
-     where v.at >= ? and v.at < ?${srcSql}${vSql} group by 1, v.type, v.currency`,
-  ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs).all()).results;
   const prods = new Map();
   const money = { gross: 0, refunded: 0, charged: 0, refundN: 0, chargeN: 0 };
   for (const r of pRows) {
@@ -652,21 +663,23 @@ export async function resultsPage(c) {
     x.revenue += sumRev(r.type, v);
   }
   const products = [...prods.values()].sort((a, b) => b.revenue - a.revenue);
-  const productNames = (await db.prepare("select distinct product from tk_conversions where product is not null order by product limit 200").all()).results.map((r) => r.product);
-  const sources = (await db.prepare("select distinct source from tk_clicks").all()).results.map((r) => r.source);
+  const productNames = prodNameRows.map((r) => r.product);
+  const sources = srcRows.map((r) => r.source);
   if (srcFilter && !sources.includes(srcFilter)) sources.push(srcFilter);
   return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, netFilter, prodFilter, list, tot, series, hasAny, sources, networks, products, productNames, money }));
 }
 
 export async function salesPage(c) {
-  const s = await freshRates(c, await getSettings(c.db));
+  const s = ratesLater(c, await getSettings(c.db));
   const range = readRange(c.url.searchParams);
   const network = T.NETWORKS[c.url.searchParams.get("network")] ? c.url.searchParams.get("network") : "";
-  const sales = (await c.db.prepare(
-    `select v.*, k.source, k.campaign, k.ad, k.keyword, k.country from tk_conversions v left join tk_clicks k on k.id = v.click_id
-     where v.at >= ? and v.at < ?${network ? " and v.network = ?" : ""} order by v.at desc limit 300`,
-  ).bind(range.start, range.end, ...(network ? [network] : [])).all()).results;
-  const events = (await c.db.prepare("select * from tk_events order by id desc limit 40").all()).results;
+  const [sales, events] = (await c.db.batch([
+    c.db.prepare(
+      `select v.*, k.source, k.campaign, k.ad, k.keyword, k.country from tk_conversions v left join tk_clicks k on k.id = v.click_id
+       where v.at >= ? and v.at < ?${network ? " and v.network = ?" : ""} order by v.at desc limit 300`,
+    ).bind(range.start, range.end, ...(network ? [network] : [])),
+    c.db.prepare("select * from tk_events order by id desc limit 40"),
+  ])).map((r) => r.results || []);
   return c.respond(TV.salesView(c.view(), { s, range, sales, events, network }));
 }
 

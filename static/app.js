@@ -83,6 +83,29 @@
   if ("serviceWorker" in navigator && document.body && document.body.classList.contains("panel")) {
     navigator.serviceWorker.register("/sw.js").catch(function () {});
   }
+  // Faster taps: start loading a panel page when the finger touches its link (or the mouse rests on it).
+  var PREFETCH = /^\/(results|sales|links|tracking|integrations|domains|settings)\/?$/;
+  var prefetched = {};
+  function prefetch(ev) {
+    var sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    var a = ev.target && ev.target.closest && ev.target.closest("a[href]");
+    if (!sw || !a || a.target || a.hasAttribute("download") || a.origin !== location.origin) return;
+    if (!PREFETCH.test(a.pathname) || a.href === location.href) return;
+    var now = Date.now();
+    if (prefetched[a.href] && now - prefetched[a.href] < 6000) return;
+    prefetched[a.href] = now;
+    sw.postMessage({ type: "prefetch", url: a.href });
+  }
+  if ("serviceWorker" in navigator && document.body && document.body.classList.contains("panel")) {
+    document.addEventListener("touchstart", prefetch, { passive: true, capture: true });
+    document.addEventListener("mousedown", prefetch, { capture: true });
+    var hoverTimer = null;
+    document.addEventListener("mouseover", function (ev) {
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(function () { prefetch(ev); }, 80);
+    }, { capture: true });
+  }
+
   function keyBytes(k) {
     var s = atob(k.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((k.length + 3) % 4));
     var a = new Uint8Array(s.length);

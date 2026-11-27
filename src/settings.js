@@ -2,12 +2,12 @@
 import { csrfField, fieldError, fmtDateTime, html, page, raw } from "./views.js";
 import { checkPassword, hashPassword } from "./security.js";
 import { NETWORKS } from "./tracker.js";
-import { freshRates, getSettings, setSetting } from "./tracker-routes.js";
+import { freshRates, getSettings, ratesLater, setSetting } from "./tracker-routes.js";
 
 const chev = raw('<svg class="row-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>');
 
 export async function settingsPage(c) {
-  const s = await freshRates(c, await getSettings(c.db));
+  const s = ratesLater(c, await getSettings(c.db));
   const nets = Object.keys(NETWORKS).filter((n) => n !== "other"); // every network the panel supports
   const devices = (await c.db.prepare("select count(*) as n from push_subs").first()).n;
   return c.respond(settingsView(c.view(), { s, nets, devices, email: c.user.email, emailReady: !!c.env.EMAIL, emailTo: c.env.EMAIL_TO || "" }));
