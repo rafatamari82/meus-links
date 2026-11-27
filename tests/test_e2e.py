@@ -582,7 +582,17 @@ class E2E(unittest.TestCase):
         bar = m.get_by_role("navigation", name="Navegação principal")
         expect(bar).to_be_visible()
         expect(bar.get_by_role("link", name="Resumo")).to_have_attribute("aria-current", "page")
-        expect(m.locator(".mcard-hero")).to_contain_text("Faturamento")
+        kpis = m.locator(".m-kpis")
+        expect(kpis).to_be_visible()
+        expect(kpis.locator(".m-kpi-hero")).to_contain_text("Faturamento")
+        expect(kpis.locator(".m-kpi-dark")).to_contain_text("Vendas")
+        expect(kpis.locator(".m-kpi-outline")).to_contain_text("Reembolsos")
+        # phone shows the short version: only the period filter, no full dashboard
+        expect(m.locator("#p")).to_be_visible()
+        expect(m.get_by_label("Plataforma")).to_be_hidden()
+        expect(m.locator(".dash-split")).to_be_hidden()
+        expect(m.locator(".results-table")).to_be_hidden()
+        m.screenshot(path="/tmp/mobile-resumo.png")
         # the top bar stays a bar on phones, and the dashboard starts right under it
         self.assertLess(m.locator(".sidebar").bounding_box()["height"], 120)
         # phone top bar: "Dashboard" on the left, logo on the right, no Sair and no Resumo header
@@ -592,7 +602,9 @@ class E2E(unittest.TestCase):
         expect(m.locator(".sidebar").get_by_role("button", name="Sair")).to_be_hidden()
         expect(m.get_by_role("heading", name="Resumo", exact=True)).to_be_hidden()
         expect(m.get_by_role("link", name="Atualizar")).to_be_hidden()
-        self.assertLess(m.locator(".dash-filters").bounding_box()["y"], 200)
+        first = m.locator(".main > :visible").first.bounding_box()["y"]
+        self.assertLess(first, 110)
+        self.assertLess(m.locator(".m-kpis").bounding_box()["y"] - (m.locator(".dash-filters").bounding_box()["y"] + m.locator(".dash-filters").bounding_box()["height"]), 40)
         bar.get_by_role("link", name="Vendas").click()
         expect(m.get_by_role("heading", name="Vendas", exact=True)).to_be_visible()
         expect(bar.get_by_role("link", name="Trackeamento")).to_have_count(0)

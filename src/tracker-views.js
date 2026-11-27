@@ -98,23 +98,29 @@ ${empty}
       <label class="sr-only" for="to">Até</label><input id="to" name="to" type="date" value="${range.to}">
       <button class="btn btn-secondary btn-sm" type="submit">Ver</button>
     </span></div>
-  <div class="field"><label for="f-source">Fonte de tráfego</label>
+  <div class="field desktop-only"><label for="f-source">Fonte de tráfego</label>
     <select id="f-source" name="source" data-autosubmit-select>${opt("", "Todas", srcFilter)}${srcOpts.map((x) => opt(x, SOURCE_LABEL[x] || x, srcFilter))}${opt("none", "Sem rastreio", srcFilter)}</select></div>
-  <div class="field"><label for="f-network">Plataforma</label>
+  <div class="field desktop-only"><label for="f-network">Plataforma</label>
     <select id="f-network" name="network" data-autosubmit-select>${opt("", "Todas", netFilter)}${Object.entries(NETWORKS).filter(([k]) => k !== "other").map(([k, n]) => opt(k, n.name, netFilter))}</select></div>
-  <div class="field"><label for="f-product">Produto</label>
+  <div class="field desktop-only"><label for="f-product">Produto</label>
     <select id="f-product" name="product" data-autosubmit-select>${opt("", "Todos", prodFilter)}${productNames.map((x) => opt(x, x, prodFilter))}</select></div>
   <noscript><button class="btn btn-secondary" type="submit">Filtrar</button></noscript>
 </form>
 
-<div class="mgrid mgrid-main">
+<div class="m-kpis mobile-only">
+  <div class="m-kpi m-kpi-hero"><p class="m-kpi-label">Faturamento</p><p class="m-kpi-value">${m(tot.revenue)}</p></div>
+  <div class="m-kpi m-kpi-dark"><p class="m-kpi-label">Vendas</p><p class="m-kpi-value">${tot.sales}</p></div>
+  <div class="m-kpi m-kpi-outline"><p class="m-kpi-label">Reembolsos</p><p class="m-kpi-value">${tot.refunds}</p></div>
+</div>
+
+<div class="mgrid mgrid-main desktop-only">
   <div class="mcard mcard-hero"><p class="mcard-label">Faturamento líquido</p><p class="mcard-value">${m(tot.revenue)}</p><p class="mcard-sub">${tot.sales} ${tot.sales === 1 ? "venda" : "vendas"}${tot.refunds ? ` · ${tot.refunds} reembolso(s)` : ""}</p></div>
   ${card("Gastos com anúncios", m(tot.cost), netFilter || prodFilter ? "O gasto é por campanha e não é dividido por plataforma ou produto." : "Soma do gasto das campanhas no período.")}
   ${card("ROAS", ratio(tot.roas), "Faturamento líquido dividido pelo gasto.")}
   ${card("Lucro", m(tot.profit), "Faturamento líquido menos o gasto.", tone(tot.profit))}
 </div>
 
-<div class="dash-split">
+<div class="dash-split desktop-only">
   <div class="dash-side">
     <section class="card pad">
       <h2 class="h-md">Vendas por produto</h2>
@@ -149,11 +155,11 @@ ${empty}
   </div>
 </div>
 
-<section class="card pad">
+<section class="card pad desktop-only">
   <h2 class="h-md">Faturamento e gasto por dia</h2>
   ${chart(series, cur)}
 </section>
-<section class="card table-wrap">
+<section class="card table-wrap desktop-only">
   <div class="table-head">
     <nav class="tabs" aria-label="Agrupar por">
       ${tab("Campanhas", { ...base, ...withSrc }, !byAd)}${tab("Anúncios", { ...base, ...withSrc, by: "ad" }, byAd)}
