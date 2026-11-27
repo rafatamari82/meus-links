@@ -619,3 +619,4 @@ body.geo-blocked { margin: 0; min-height: 100vh; background: #fdee04; display: g
 .geo-bino .lens { fill: #9fd3ea; }
 .geo-bino .shine { fill: #fff; }
 .geo-text { margin: 0; font-size: 34px; font-weight: 800; color: #1b1b1b; letter-spacing: -0.01em; }
+.geo-mico { display: block; width: min(300px, 70vw); height: auto; margin: 8px auto 0; }

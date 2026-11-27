@@ -493,7 +493,6 @@ export function geoBlocked(assetVersion) {
 <link rel="stylesheet" href="/static/tokens.css?v=${assetVersion}"><link rel="stylesheet" href="/static/app.css?v=${assetVersion}"></head>
 <body class="geo-blocked"><main class="geo-main">
 <h1><img class="geo-banner" src="/static/oi-curioso.png?v=${assetVersion}" alt="Oi, curioso!"></h1>
-<svg class="geo-bino" viewBox="0 0 120 70" aria-hidden="true"><rect x="49" y="18" width="22" height="16" rx="4"/><circle cx="30" cy="40" r="24"/><circle cx="90" cy="40" r="24"/><circle class="lens" cx="30" cy="40" r="15"/><circle class="lens" cx="90" cy="40" r="15"/><circle class="shine" cx="24" cy="34" r="4"/><circle class="shine" cx="84" cy="34" r="4"/></svg>
-<p class="geo-text">Aqui não.</p>
+<img class="geo-mico" src="/static/mico.svg?v=${assetVersion}" alt="">
 </main></body></html>`.s;
 }

@@ -406,7 +406,7 @@ class E2E(unittest.TestCase):
         status, body = self.geo_hit("geobloq", "BR")
         self.assertEqual(status, 403)
         self.assertIn('alt="Oi, curioso!"', body)
-        self.assertIn("Aqui não.", body)
+        self.assertIn("mico.svg", body)
         self.assertEqual(self.geo_hit("geobloq", "PT")[0], 302)
         self.assertEqual(self.geo_hit("geobloq", None)[0], 302)  # unknown country passes
         self.assertEqual(self.clicks_for("geobloq"), 2)  # the blocked visit is not counted
