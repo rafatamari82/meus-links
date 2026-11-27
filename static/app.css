@@ -365,3 +365,13 @@ a.set-row:hover { background: var(--color-surface); }
 .small { font-size: var(--text-xs); }
 .btn-icon { display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 760px) { .shell { grid-template-rows: auto 1fr; align-content: start; } .sidebar { align-self: start; } }
+
+/* Phone top bar: page name on the left, logo on the right; Sair lives in Ajustes. */
+.topbar-title { display: none; }
+@media (max-width: 760px) {
+  .sidebar { justify-content: space-between; }
+  .topbar-title { display: block; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--color-text); }
+  .sidebar .brand { margin-left: auto; }
+  .sidebar-foot { display: none; }
+  .dash-head { display: none; }
+}

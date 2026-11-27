@@ -61,6 +61,7 @@ export function page(c, title, body) {
 <body class="panel">
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
+    ${c.section === "results" ? html`<span class="topbar-title" aria-hidden="true">Dashboard</span>` : ""}
     <a class="brand" href="/results">${ICON}<span>Cutti</span></a>
     <nav>${nav("/results", "Resumo", c.section === "results", TAB_ICONS.home)}${nav("/sales", "Vendas", c.section === "sales", TAB_ICONS.list)}${nav("/links", "Encurtador de Link", c.section === "links", TAB_ICONS.link)}${nav("/tracking", "Trackeamento", c.section === "tracking", TAB_ICONS.target)}${nav("/integrations", "Avisos e moeda", c.section === "integrations", TAB_ICONS.bell)}${nav("/domains", "Domínios", c.section === "domains", TAB_ICONS.globe)}${nav("/settings", "Ajustes", c.section === "settings", TAB_ICONS.gear)}</nav>
     <form method="post" action="/logout" class="sidebar-foot">${csrfField(c)}<button class="btn btn-ghost btn-sm" type="submit">Sair</button></form>
