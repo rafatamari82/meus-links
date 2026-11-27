@@ -157,38 +157,83 @@ class Ctx {
 
 // ---------------------------------------------------------------- the redirect
 
+// A click needs the domain, the link, the anti-robot switch and the owner's blocked IPs. They come in ONE query,
+// and the answer is kept for a short while in this isolate and in the Cloudflare datacenter nearest the visitor,
+// so most clicks never travel to the database (which sits far away, in the US).
+const SHORT_TTL_S = 30;
+const shortMem = new Map();
+// The key lives on the link's own host (a hostname of this account), under a path no link can have.
+const shortKey = (host, slug) => `https://${host}/__cutti_cache__/${encodeURIComponent(slug || "-")}`;
+const edgeCache = () => (typeof caches !== "undefined" && caches.default ? caches.default : null);
+
+async function lookupShort(c, slug) {
+  const key = shortKey(c.host, slug);
+  const mem = shortMem.get(key);
+  if (mem && mem.exp > Date.now()) return mem.v;
+  const cache = edgeCache();
+  if (cache) {
+    const hit = await cache.match(key).catch(() => null);
+    if (hit) {
+      const v = await hit.json();
+      shortMem.set(key, { v, exp: Date.now() + SHORT_TTL_S * 1000 });
+      return v;
+    }
+  }
+  const row = await c.db.prepare(
+    `select d.id as d_id, d.active as d_active, d.not_found_url as d_nf,
+       (select value from settings where key = 'tk_antibot') as d_antibot,
+       l.*, (select group_concat(ip) from ip_blocks b where b.user_id = l.user_id) as blocked_ips
+     from domains d left join links l on l.domain_id = d.id and l.slashtag_lower = ?
+     where d.full_name = ?`,
+  ).bind(slug, c.host).first();
+  if (!row) return null;
+  const { d_id, d_active, d_nf, d_antibot, ...rest } = row;
+  const v = { domain: { id: d_id, active: d_active, not_found_url: d_nf, antibot: d_antibot }, link: rest.id ? rest : null };
+  if (v.domain.active) {
+    shortMem.set(key, { v, exp: Date.now() + SHORT_TTL_S * 1000 });
+    if (shortMem.size > 2000) shortMem.delete(shortMem.keys().next().value);
+    if (cache) c.exec.waitUntil(cache.put(key, new Response(JSON.stringify(v), {
+      headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${SHORT_TTL_S}` },
+    })).catch(() => {}));
+  }
+  return v;
+}
+
+/** After a change in the panel: forget what this isolate kept, and the edge copies of the links touched here. */
+function forgetShort(c, pairs = []) {
+  shortMem.clear();
+  const cache = edgeCache();
+  if (cache) for (const [host, slug] of pairs) c.exec.waitUntil(cache.delete(shortKey(host, String(slug).toLowerCase())).catch(() => {}));
+}
+
 async function serveShort(c, slashtag) {
   const { db } = c;
   if (!["GET", "HEAD"].includes(c.req.method)) return c.respond("Método não permitido", 405, { "Content-Type": "text/plain" });
 
-  // The anti-robot switch rides along with the domain lookup, so a click costs no extra trip to the database.
-  const domain = await db.prepare("select d.*, (select value from settings where key = 'tk_antibot') as antibot from domains d where full_name = ?").bind(c.host).first();
   if (slashtag === ".well-known/shortlinks-verify") {
-    if (!domain) return c.respond(V.publicNotFound(ASSET_VERSION), 404);
+    const d = await db.prepare("select id from domains where full_name = ?").bind(c.host).first();
+    if (!d) return c.respond(V.publicNotFound(ASSET_VERSION), 404);
     return new Response(await domainToken(c.secret, c.host), {
       headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" },
     });
   }
-  if (!domain) return c.respond(V.publicNotFound(ASSET_VERSION), 404);
+  const found = await lookupShort(c, slashtag && !slashtag.includes("/") ? slashtag.toLowerCase() : "");
+  if (!found) return c.respond(V.publicNotFound(ASSET_VERSION), 404);
+  const { domain } = found;
   if (!domain.active) {
     // A request reached this Worker on this host: Cloudflare is routing it here.
     const ts = now();
     await db.prepare("update domains set active = 1, verified_at = ?, last_check_error = null, updated_at = ? where id = ?")
       .bind(ts, ts, domain.id).run();
   }
-
-  let link = null;
-  if (slashtag && !slashtag.includes("/")) {
-    // The visitor's IP is checked against the owner's blocked IPs in the same query (no extra trip).
-    link = await db.prepare("select l.*, exists(select 1 from ip_blocks b where b.user_id = l.user_id and b.ip = ?) as ip_blocked from links l where l.domain_id = ? and l.slashtag_lower = ?")
-      .bind(c.req.headers.get("CF-Connecting-IP") || "", domain.id, slashtag.toLowerCase()).first();
-  }
+  const link = found.link ? { ...found.link } : null;
   if (!link) {
     if (domain.not_found_url) {
       return new Response(null, { status: 302, headers: { Location: domain.not_found_url, "Cache-Control": "private, no-store" } });
     }
     return c.respond(V.publicNotFound(ASSET_VERSION), 404);
   }
+  link.ip_blocked = !!link.blocked_ips && link.blocked_ips.split(",").includes(c.req.headers.get("CF-Connecting-IP") || "");
 
   // Cloudflare fills request.cf; the header is only a fallback for local runs.
   const country = (c.req.cf?.country || (c.req.cf ? "" : c.req.headers.get("CF-IPCountry")) || "").toUpperCase().slice(0, 2) || null;
@@ -431,6 +476,7 @@ async function createLink(c) {
         await c.db.prepare(
           "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, geo_mode, geo_countries, block_vpn, track, network, sub_param, track_source, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         ).bind(id, c.user.id, domain.id, s, s.toLowerCase(), dest, title, geo.mode, geo.countries, vpn, track.on, track.on ? track.network : null, track.on ? track.sub_param : null, track.source, ts, ts).run();
+        c.touchedLinks = [[domain.full_name, s]];
         c.flash("success", "Link criado.");
         return c.redirect(`/links?new=${id}`);
       } catch (e) {
@@ -485,6 +531,7 @@ async function editLink(c, id) {
           "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, geo_mode = ?, geo_countries = ?, block_vpn = ?, track = ?, network = ?, sub_param = ?, track_source = ?, updated_at = ? where id = ? and user_id = ?",
         ).bind(r.dest, r.slug, r.slug.toLowerCase(), r.title, r.domain.id, r.geo.mode, r.geo.countries, r.vpn, r.track.on,
           r.track.on ? r.track.network : null, r.track.on ? r.track.sub_param : null, r.track.source, now(), id, c.user.id).run();
+        c.touchedLinks = [[link.domain_name, link.slashtag], [r.domain.full_name, r.slug]];
         c.flash("success", "Alterações salvas.");
         return c.redirect("/links");
       } catch (e) {
@@ -501,6 +548,7 @@ async function deleteLink(c, id) {
   const link = await getLink(c, id);
   if (!link) return notFound(c);
   await c.db.prepare("delete from links where id = ? and user_id = ?").bind(id, c.user.id).run();
+  c.touchedLinks = [[link.domain_name, link.slashtag]];
   c.flash("success", `Link /${link.slashtag} apagado.`);
   return c.redirect("/links");
 }
@@ -768,7 +816,9 @@ async function handle(req, env, exec) {
         if (method !== "GET") return c.redirect("/login");
         return c.redirect(`/login?next=${encodeURIComponent(path + c.url.search)}`);
       }
-      return fn(c, m[1]);
+      const res = await fn(c, m[1]);
+      if (method === "POST") forgetShort(c, c.touchedLinks || []);
+      return res;
     }
   }
   // Anything else on the panel host is a short link on the panel's own domain.
