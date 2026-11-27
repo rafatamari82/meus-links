@@ -17,13 +17,13 @@ export const NETWORKS = {
   buygoods: { name: "BuyGoods", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}&type={CONV_TYPE}&product={PRODUCT_CODENAME}" },
   digistore24: { name: "Digistore24", param: "cid", currency: "USD", query: "cid={cid}&amount={amount_affiliate}&txid={order_id}&currency={currency}&product={product_name}" },
   maxweb: { name: "MaxWeb", param: "subid", currency: "USD", query: "cid={SUBID}&amount={COMMISSION_AMOUNT}&txid={ORDERID}&product={PRODUCT_CODENAME}" },
-  gurumedia: { name: "GuruMedia", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&product={offer_name}" },
-  smartadv: { name: "SmartADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&product={offer_name}" },
-  smashloud: { name: "SmashLoud", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={currency}&product={offer_name}" },
-  clickadv: { name: "ClickADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={conversion_id}&currency={offer_currency}&product={offer_name}" },
+  gurumedia: { name: "GuruMedia", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&product={offer_name}&country={geo_country_code}" },
+  smartadv: { name: "SmartADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&product={offer_name}&country={geo_country_code}" },
+  smashloud: { name: "SmashLoud", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={currency}&product={offer_name}&country={geo_country_code}" },
+  clickadv: { name: "ClickADV", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={conversion_id}&currency={offer_currency}&product={offer_name}&country={geo_country_code}" },
   hotmart: { name: "Hotmart", param: "sck", currency: "BRL", json: true },
   kiwify: { name: "Kiwify", param: "sck", currency: "BRL", json: true },
-  medisscalers: { name: "MediaScalers", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&status={status}&product={offer_name}" },
+  medisscalers: { name: "MediaScalers", param: "sub1", currency: "USD", query: "cid={sub1}&amount={payout_amount}&txid={transaction_id}&currency={offer_currency}&status={status}&product={offer_name}&country={geo_country_code}" },
   other: { name: "Outra rede", param: "sub1", currency: "USD", query: "cid=SUBID&amount=VALOR&txid=PEDIDO&product=PRODUTO", check: true },
 };
 
@@ -198,7 +198,7 @@ export function parsePostback(network, fields, json) {
     currency: String(pick(f, "currency", "cur") || net.currency).replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3) || net.currency,
     product: cleanProduct(pick(f, "product", "product_name", "offer_name", "offer", "product_codename", "item", "sku")
       ?? (json ? pick(json, "product", "product_name", "offer_name") : null)),
-    country: cleanCountry(pick(f, "country", "country_code", "countrycode", "geo", "cc", "billing_country", "customer_country")
+    country: cleanCountry(pick(f, "country", "country_code", "geo_country_code", "countrycode", "geo", "cc", "billing_country", "customer_country")
       ?? (json ? pick(json, "country", "country_code") : null)),
   };
 }

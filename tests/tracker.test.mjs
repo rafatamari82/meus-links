@@ -134,3 +134,9 @@ test("Google Ads script also sends age and gender", () => {
   assert.match(js, /demo: demo/);
   assert.doesNotThrow(() => new Function(js));
 });
+
+test("Everflow-style networks send the buyer's country", () => {
+  for (const n of ["gurumedia", "smartadv", "smashloud", "clickadv", "medisscalers"]) assert.match(T.NETWORKS[n].query, /country=\{geo_country_code\}/);
+  assert.equal(T.parsePostback("gurumedia", { cid: "ctaaaaaaaaaa", amount: "30", country: "CA" }).country, "CA");
+  assert.equal(T.parsePostback("smartadv", { cid: "ctaaaaaaaaaa", amount: "30", country: "{geo_country_code}" }).country, null);
+});
