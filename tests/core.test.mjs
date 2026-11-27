@@ -98,3 +98,17 @@ test("clean geo", () => {
   assert.equal(core.countryOptions()[0][1], "Brasil");
   assert.equal(core.countryOptions().length, core.COUNTRY_CODES.length);
 });
+
+test("anti-robot: reviewers and previews pass, scripts and hosting browsers are robots", () => {
+  const chrome = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile Safari/604.1";
+  assert.equal(core.botKind(chrome, { asn: 28573 }), "human");
+  assert.equal(core.botKind("AdsBot-Google (+http://www.google.com/adsbot.html)", { asn: 15169 }), "good");
+  assert.equal(core.botKind("Mozilla/5.0 (compatible; Googlebot/2.1)", {}), "good");
+  assert.equal(core.botKind("WhatsApp/2.23", {}), "good");
+  assert.equal(core.botKind("facebookexternalhit/1.1", { asn: 32934 }), "good");
+  assert.equal(core.botKind("curl/8.4.0", {}), "bad");
+  assert.equal(core.botKind("python-requests/2.31", { asn: 16509 }), "bad");
+  assert.equal(core.botKind("", {}), "bad");
+  assert.equal(core.botKind(chrome, { asn: 16509 }), "bad"); // a "browser" on Amazon's cloud
+  assert.equal(core.botKind(chrome, { asn: 15169 }), "human"); // Google's own network is never blocked
+});

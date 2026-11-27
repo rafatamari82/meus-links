@@ -47,6 +47,11 @@ function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
 </div>
 <p class="set-note">Dólar comercial do momento${s.rate_src ? ` (fonte: ${s.rate_src})` : ""}, atualizado a cada 15 minutos. Apps de banco e de câmbio podem mostrar um pouco acima, porque somam a margem deles.${s.rate_err ? ` Falhas na última busca: ${s.rate_err}.` : ""}</p>
 
+<h2 class="set-title">Links</h2>
+<div class="set-group">
+  ${sw("antibot", "on", s.antibot, html`Barrar robôs<span class="hint">Scripts e servidores ficam de fora. Google, NewsBreak e prévias de redes sociais passam sempre.</span>`)}
+</div>
+
 <h2 class="set-title">Notificações de venda</h2>
 <div class="set-group">
   <form method="post" action="/integrations/push-subscribe" class="set-row" data-push data-push-key="${s.vapid.publicKey}">
@@ -85,6 +90,9 @@ export async function settingsPost(c, action) {
     else c.flash("error", `Não consegui buscar a cotação agora (${after.rate_err || "sem resposta"}).`);
   } else if (action === "email") {
     await setSetting(c.db, "email_on", f.get("on") ? "1" : "0");
+  } else if (action === "antibot") {
+    await setSetting(c.db, "antibot", f.get("on") ? "1" : "0");
+    c.flash("success", f.get("on") ? "Filtro anti-robô ligado." : "Filtro anti-robô desligado.");
   } else if (action === "refunds") {
     await setSetting(c.db, "notify_refunds", f.get("on") ? "1" : "0");
   } else if (action === "mute") {

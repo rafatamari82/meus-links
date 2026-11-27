@@ -4,7 +4,7 @@ import { countryName } from "./core.js";
 
 const flag = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((ch) => 127397 + ch.charCodeAt(0))) : "");
 const place = (cc) => (cc && cc !== "XX" ? `${flag(cc)} ${countryName(cc)}` : "");
-import { convert, fmtMoney, googleAdsScript, NETWORKS, renderTemplate, SAMPLE_VARS, SOURCES, TEMPLATE_VARS } from "./tracker.js";
+import { AGE_LABEL, convert, fmtMoney, GENDER_LABEL, googleAdsScript, NETWORKS, renderTemplate, SAMPLE_VARS, SOURCES, TEMPLATE_VARS } from "./tracker.js";
 
 const SOURCE_LABEL = { ...SOURCES, none: "Sem rastreio" };
 const TYPE_LABEL = { sale: "Venda", upsell: "Upsell", refund: "Reembolso", chargeback: "Chargeback" };
@@ -55,7 +55,7 @@ function chart(series, cur) {
 <tbody>${series.map((x) => html`<tr><th scope="row">${ddmm(x.d)}</th><td>${fmtMoney(x.rev, cur)}</td><td>${fmtMoney(x.cost, cur)}</td></tr>`)}</tbody></table>`;
 }
 
-export function resultsView(c, { s, range, byAd, srcFilter, netFilter = "", prodFilter = "", list, tot, series, hasAny, sources = [], networks = [], products = [], productNames = [], money = {} }) {
+export function resultsView(c, { s, range, byAd, srcFilter, netFilter = "", prodFilter = "", list, tot, series, hasAny, sources = [], networks = [], products = [], productNames = [], money = {}, audience = { age: [], gender: [] } }) {
   const cur = s.currency;
   const m = (x) => (x == null ? "—" : fmtMoney(x, cur));
   const tab = (label, params, on) => html`<a class="tab ${on ? "is-current" : ""}" href="/results?${new URLSearchParams(params)}" ${on ? raw('aria-current="page"') : ""}>${label}</a>`;
@@ -166,6 +166,7 @@ ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) =
   <h2 class="h-md">Faturamento e gasto por dia</h2>
   ${chart(series, cur)}
 </section>
+${audienceSection(audience, m, cur)}
 <section class="card table-wrap desktop-only">
   <div class="table-head">
     <nav class="tabs" aria-label="Agrupar por">
@@ -197,6 +198,29 @@ ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) =
 </section>`);
 }
 
+function audienceSection(audience, m) {
+  const any = audience.age.length || audience.gender.length;
+  const table = (title, rows, labels) => {
+    const order = Object.keys(labels);
+    rows = [...rows].sort((a, b) => order.indexOf(a.bucket) - order.indexOf(b.bucket));
+    const total = rows.reduce((a, r) => a + r.cost, 0) || 1;
+    return html`<div class="aud-col"><h3 class="h-md">${title}</h3>
+    <table class="simple aud-table"><thead><tr><th scope="col">${title === "Idade" ? "Faixa" : "Sexo"}</th><th scope="col" class="num">Gasto</th><th scope="col" class="num">Cliques</th><th scope="col" class="num">Conversões</th><th scope="col" class="num">Custo/conv.</th></tr></thead>
+    <tbody>${rows.map((r) => html`<tr>
+      <td>${labels[r.bucket] || r.bucket}<svg class="rank-bar" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="6" rx="3" class="rank-bg"/><rect width="${Math.max(2, Math.round((r.cost / total) * 100))}" height="6" rx="3" class="rank-fg"/></svg></td>
+      <td class="num">${m(r.cost)}<div class="hint">${Math.round((r.cost / total) * 100)}%</div></td>
+      <td class="num">${r.clicks}</td>
+      <td class="num">${(Math.round(r.conv * 10) / 10).toString().replace(".", ",")}</td>
+      <td class="num">${r.conv >= 0.5 ? m(Math.round(r.cost / r.conv)) : "—"}</td></tr>`)}</tbody></table></div>`;
+  };
+  return html`<section class="card pad desktop-only" id="publico">
+  <h2 class="h-md">Público do Google Ads: idade e sexo</h2>
+  ${any ? html`<p class="hint">Dados do próprio Google, no período escolhido. As conversões são as que o Google registrou, incluindo as vendas que o Cutti envia para ele.</p>
+  <div class="aud-grid">${table("Idade", audience.age, AGE_LABEL)}${table("Sexo", audience.gender, GENDER_LABEL)}</div>`
+    : html`<p class="muted">Ainda sem dados. Copie de novo o script em <a href="/tracking">Trackeamento</a> e cole no Google Ads por cima do antigo: a versão nova também manda idade e sexo.</p>`}
+</section>`;
+}
+
 export function salesView(c, { s, range, sales, events, network = "", days = {}, today = "" }) {
   return page({ ...c, section: "sales" }, "Vendas", html`
 <header class="page-head">
@@ -212,7 +236,7 @@ ${sales.length ? html`<ul class="sale-list" aria-label="Vendas">${sales.map((v) 
   const rows = [
     ["Produto", v.product], ["Valor", `${neg ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}`],
     ["Em reais", v.currency !== "BRL" ? `${neg ? "−" : ""}${fmtMoney(convert(v.amount_cents, v.currency, "BRL", s), "BRL")}` : ""],
-    ["Rede", net], ["País", place(v.country)], ["Origem", v.click_id ? SOURCE_LABEL[v.source] || v.source : "Sem clique rastreado"],
+    ["Rede", net], ["País", place(v.country) || "Não informado"], ["Origem", v.click_id ? SOURCE_LABEL[v.source] || v.source : "Sem clique rastreado"],
     ["Campanha", v.campaign], ["Anúncio", v.ad], ["Palavra-chave", v.keyword], ["Pedido", v.txid], ["Data", fmtDateTime(v.at)],
     [isToday ? "Vendas hoje" : "Vendas no dia", day ? String(day.sales) : ""],
     [isToday ? "Faturamento hoje" : "Faturamento no dia", day ? fmtMoney(day.revenue, s.currency) : ""],
@@ -221,7 +245,7 @@ ${sales.length ? html`<ul class="sale-list" aria-label="Vendas">${sales.map((v) 
     <summary class="sale-sum">
       <div class="sale-main">
         <strong>${v.product || net}</strong>
-        <span class="hint">${fmtDateTime(v.at)} · ${net}</span>
+        <span class="hint">${fmtDateTime(v.at)} · ${net}<span class="sale-more">${place(v.country) ? ` · ${place(v.country)}` : ""}${v.click_id ? ` · ${SOURCE_LABEL[v.source] || v.source}` : ""}</span></span>
       </div>
       <div class="sale-side">
         <span class="sale-amount ${neg ? "neg" : ""}">${neg ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}</span>
@@ -229,25 +253,10 @@ ${sales.length ? html`<ul class="sale-list" aria-label="Vendas">${sales.map((v) 
       </div>
     </summary>
     <dl class="sale-facts">${rows.map(([k, x]) => html`<div><dt>${k}</dt><dd>${x}</dd></div>`)}</dl>
+    <div class="sale-foot"><form method="post" action="/sales/${v.id}/delete" data-confirm="Remover este registro? Ele sai dos resultados.">${csrfField(c)}<button class="btn btn-ghost btn-xs danger-text" type="submit">Remover registro</button></form></div>
   </details></li>`;
 })}</ul>` : ""}
-<section class="card table-wrap sales-table-wrap">
-  ${sales.length ? html`
-  <table class="links-table">
-    <thead><tr><th scope="col">Quando</th><th scope="col">Tipo</th><th scope="col">Produto</th><th scope="col">Rede</th><th scope="col">País</th><th scope="col">Origem</th><th scope="col" class="num">Valor</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
-    <tbody>${sales.map((v) => html`
-      <tr>
-        <td data-label="Quando" class="nowrap">${fmtDateTime(v.at)}</td>
-        <td data-label="Tipo"><span class="badge ${v.type === "sale" || v.type === "upsell" ? "badge-success" : "badge-warning"}">${TYPE_LABEL[v.type]}</span></td>
-        <td data-label="Produto">${v.product ? html`<strong>${v.product}</strong>` : html`<span class="muted">—</span>`}</td>
-        <td data-label="Rede">${NETWORKS[v.network]?.name || v.network}<div class="hint">pedido ${v.txid}</div></td>
-        <td data-label="País">${place(v.country) || html`<span class="muted">—</span>`}</td>
-        <td data-label="Origem">${v.click_id ? html`${SOURCE_LABEL[v.source] || v.source}<div class="hint">${[v.campaign, v.ad, v.keyword].filter(Boolean).join(" · ") || "sem campanha"}</div>` : html`<span class="muted">Sem clique rastreado</span>`}</td>
-        <td data-label="Valor" class="num">${v.type === "refund" || v.type === "chargeback" ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}</td>
-        <td class="actions-cell"><div class="actions"><form method="post" action="/sales/${v.id}/delete" data-confirm="Remover este registro? Ele sai dos resultados.">${csrfField(c)}<button class="btn btn-ghost btn-xs danger-text" type="submit">Remover</button></form></div></td>
-      </tr>`)}</tbody>
-  </table>` : html`<p class="muted pad">Nenhuma venda neste período.</p>`}
-</section>
+${sales.length ? "" : html`<section class="card"><p class="muted pad">Nenhuma venda neste período.</p></section>`}
 <details class="card pad events-box">
   <summary class="h-lg">Últimos avisos recebidos</summary>
   <p class="hint">Tudo o que as redes e o Google Ads mandaram, inclusive o que foi ignorado. Use para conferir se a integração está certa.</p>

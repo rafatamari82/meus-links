@@ -5,6 +5,7 @@ Run: python3 tests/test_e2e.py
 Needs: Node 22+, playwright (Python) and Chrome.
 """
 import os
+import json
 import re
 import socket
 import subprocess
@@ -165,6 +166,32 @@ class E2E(unittest.TestCase):
         expect(p.get_by_role("dialog")).to_be_hidden()
 
     # F02 visitor
+    def test_f03_antibot_filter(self):
+        self.create("https://exemplo.com/robo", "robocheck")
+        p = self.page
+        chrome = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36"
+        get = lambda ua, asn=0: p.request.get(self.base + "/robocheck", max_redirects=0,
+                                              headers={"User-Agent": ua, "X-Test-ASN": str(asn)}).status
+        self.assertEqual(get("curl/8.4.0"), 403)
+        self.assertEqual(get("python-requests/2.31"), 403)
+        self.assertEqual(get(chrome, 16509), 403)          # browser on a cloud server
+        self.assertEqual(get("AdsBot-Google (+http://www.google.com/adsbot.html)", 15169), 302)  # ad review passes
+        self.assertEqual(get("WhatsApp/2.23.1"), 302)       # link preview passes
+        self.assertEqual(get(chrome), 302)                  # a person passes
+        self.assertEqual(self.clicks_for("robocheck"), 1)
+        p.get_by_role("link", name=re.compile(r"^Estatísticas de robocheck:")).click()
+        expect(p.get_by_text("3 acessos de robôs foram barrados pelo filtro anti-robô.")).to_be_visible()
+        # switch it off: robots go through again (and still do not count)
+        p.goto(self.base + "/settings")
+        p.get_by_label(re.compile("^Barrar robôs")).uncheck()
+        expect(p.get_by_text("Filtro anti-robô desligado.")).to_be_visible()
+        self.assertEqual(get("curl/8.4.0"), 302)
+        self.assertEqual(self.clicks_for("robocheck"), 1)
+        p.goto(self.base + "/settings")
+        p.get_by_label(re.compile("^Barrar robôs")).check()
+        expect(p.get_by_text("Filtro anti-robô ligado.")).to_be_visible()
+        self.assertEqual(get("curl/8.4.0"), 403)
+
     def test_f02_bots_and_previews_do_not_count(self):
         self.create("https://exemplo.com/bot", "botcheck")
         for ua in ["WhatsApp/2.23.1", "facebookexternalhit/1.1", "TelegramBot (like TwitterBot)"]:
@@ -462,10 +489,15 @@ class E2E(unittest.TestCase):
         expect(p.locator("tr", has_text="77")).to_be_visible()
 
         p.goto(self.base + "/sales?p=today")
-        sale_row = p.locator("tr", has=p.locator("td[data-label=Tipo]")).filter(has_text="pedido CB1")
-        expect(sale_row).to_contain_text("Venda")
-        expect(sale_row.locator("td[data-label=Produto]")).to_have_text("HoneyBoost")
-        expect(sale_row.locator("td[data-label=País]")).to_contain_text("Estados Unidos")
+        sale = p.locator(".sale-item").filter(has=p.locator("dd", has_text="CB1"))
+        expect(sale.locator("summary")).to_contain_text("Venda")
+        expect(sale.locator("summary strong")).to_have_text("HoneyBoost")
+        expect(sale.locator("summary")).to_contain_text("Estados Unidos")
+        sale.locator("summary").click()
+        expect(sale.locator("dt", has_text="País").locator("xpath=..")).to_contain_text("Estados Unidos")
+        expect(sale.locator("dt", has_text="Produto").locator("xpath=..")).to_contain_text("HoneyBoost")
+        expect(sale.get_by_role("button", name="Remover registro")).to_be_visible()
+        p.screenshot(path="/tmp/desk-vendas.png")
         p.locator("summary", has_text="Últimos avisos recebidos").click()
         expect(p.get_by_text(f"clique {cid}").first).to_be_visible()
         p.goto(self.base + "/results?p=today")
@@ -722,6 +754,30 @@ class E2E(unittest.TestCase):
         p.once("dialog", lambda d: d.accept())
         p.locator("#google").get_by_role("button", name="Desconectar").click()
         expect(p.get_by_text("Google Ads desconectado")).to_be_visible()
+
+    def test_t13_google_age_and_gender(self):
+        p = self.page
+        key = self.tracker_key()
+        p.goto(self.base + "/results?p=today")
+        expect(p.locator("#publico")).to_contain_text("Ainda sem dados")
+        today = time.strftime("%Y-%m-%d", time.gmtime(time.time() - 3 * 3600))
+        demo = [
+            {"date": today, "campaign_id": "9001", "dim": "age", "bucket": "AGE_RANGE_25_34", "cost_micros": 30000000, "clicks": 40, "conversions": 3},
+            {"date": today, "campaign_id": "9001", "dim": "age", "bucket": "AGE_RANGE_55_64", "cost_micros": 10000000, "clicks": 9, "conversions": 0},
+            {"date": today, "campaign_id": "9001", "dim": "gender", "bucket": "FEMALE", "cost_micros": 25000000, "clicks": 30, "conversions": 2},
+            {"date": today, "campaign_id": "9001", "dim": "gender", "bucket": "MALE", "cost_micros": 15000000, "clicks": 19, "conversions": 1},
+            {"date": today, "campaign_id": "9001", "dim": "nope", "bucket": "X"},
+        ]
+        r = p.request.post(f"{self.base}/cost/{key}/google", data=json.dumps({"currency": "BRL", "rows": [], "demo": demo}),
+                           headers={"Content-Type": "application/json"})
+        self.assertEqual(r.status, 200)
+        p.goto(self.base + "/results?p=today")
+        box = p.locator("#publico")
+        expect(box.locator("tr", has_text="25 a 34")).to_contain_text("R$ 30,00")
+        expect(box.locator("tr", has_text="25 a 34")).to_contain_text("R$ 10,00")  # cost per conversion
+        expect(box.locator("tr", has_text="Mulheres")).to_contain_text("63%")
+        expect(box.locator("tr", has_text="Homens")).to_contain_text("19")
+        box.screenshot(path="/tmp/desk-publico.png")
 
     def test_t11_google_script_uploads_sales(self):
         p = self.page

@@ -39,6 +39,7 @@ export async function getSettings(db) {
     tg_chat: s.tg_chat || "",
     tg_name: s.tg_name || "",
     notify_refunds: s.notify_refunds !== "0",
+    antibot: s.antibot !== "0",
     notify_muted: (s.notify_muted || "").split(",").filter(Boolean),
     rate_auto: s.rate_auto !== "0",
     rate_at: s.rate_at || "",
@@ -211,8 +212,8 @@ export async function postback(c, key, network) {
   const txid = p.txid || (click ? `${click.id}` : `sem-id-${randomToken(6)}`);
   const convId = randomToken(12);
   const res = await c.db.prepare(
-    "insert or ignore into tk_conversions (id, click_id, network, txid, type, amount_cents, currency, at, product) values (?,?,?,?,?,?,?,?,?)",
-  ).bind(convId, click?.id || null, network, txid, p.type, Math.abs(p.amount_cents || 0), p.currency || "USD", nowIso(), p.product || null).run();
+    "insert or ignore into tk_conversions (id, click_id, network, txid, type, amount_cents, currency, at, product, country) values (?,?,?,?,?,?,?,?,?,?)",
+  ).bind(convId, click?.id || null, network, txid, p.type, Math.abs(p.amount_cents || 0), p.currency || "USD", nowIso(), p.product || null, p.country || null).run();
   const dup = !res.meta?.changes;
   if (!dup) {
     c.exec.waitUntil(GA.onConversion(c, { id: convId, type: p.type, txid: p.txid, network, gclid: click?.gclid }));
@@ -267,7 +268,10 @@ async function saleMessage(db, s, network, p, click) {
     origem: click ? (T.SOURCES[click.source] || click.source) : "sem clique rastreado",
     campanha, anuncio: click?.ad || "", palavra: click?.keyword || "", pedido: p.txid || "", produto: p.product || "",
     hoje: String(hoje), total_hoje: T.fmtMoney(total, s.currency),
-    pais: /^[A-Z]{2}$/.test(click?.country || "") && !["XX", "T1"].includes(click.country) ? `${flag(click.country)} ${countryName(click.country)}` : "",
+    pais: (() => {
+      const cc = T.cleanCountry(click?.country) || p.country;
+      return cc ? `${flag(cc)} ${countryName(cc)}` : "";
+    })(),
   };
   return messageFrom(s, vars, refund);
 }
@@ -417,20 +421,36 @@ export async function googleCost(c, key) {
   const rows = Array.isArray(data.rows) ? data.rows.slice(0, 5000) : [];
   const ts = nowIso();
   const stmts = [];
+  let costRows = 0;
   for (const r of rows) {
     const date = T.normDate(r.date);
     if (!date || !r.campaign_id) continue;
+    costRows++;
     stmts.push(costUpsert(c.db, {
       date, source: "google", campaign_key: String(r.campaign_id).slice(0, 60), campaign_name: String(r.campaign_name || "").slice(0, 200),
       cost_cents: Math.round(Number(r.cost_micros || 0) / 10000), currency,
       clicks: Number(r.clicks) || 0, impressions: Number(r.impressions) || 0,
     }, ts));
   }
+  // Age and gender (script v3).
+  const demo = Array.isArray(data.demo) ? data.demo.slice(0, 20000) : [];
+  for (const r of demo) {
+    const date = T.normDate(r.date);
+    const dim = r.dim === "age" ? "age" : r.dim === "gender" ? "gender" : "";
+    const bucket = String(r.bucket || "").slice(0, 40);
+    if (!date || !dim || !bucket || !r.campaign_id) continue;
+    stmts.push(c.db.prepare(
+      `insert into tk_demo (date, campaign_key, dim, bucket, cost_cents, currency, clicks, impressions, conversions, updated_at) values (?,?,?,?,?,?,?,?,?,?)
+       on conflict (date, campaign_key, dim, bucket) do update set cost_cents = excluded.cost_cents, currency = excluded.currency,
+       clicks = excluded.clicks, impressions = excluded.impressions, conversions = excluded.conversions, updated_at = excluded.updated_at`,
+    ).bind(date, String(r.campaign_id).slice(0, 60), dim, bucket, Math.round(Number(r.cost_micros || 0) / 10000), currency,
+      Number(r.clicks) || 0, Number(r.impressions) || 0, Number(r.conversions) || 0, ts));
+  }
   for (let i = 0; i < stmts.length; i += 50) await c.db.batch(stmts.slice(i, i + 50));
   await setSetting(c.db, "gscript_at", ts);
   if (!data.want_conversions) {
-    await logEvent(c.db, "google-ads", "ok", `gasto: ${stmts.length} linha(s)`, "");
-    return text(`ok ${stmts.length}`);
+    await logEvent(c.db, "google-ads", "ok", `gasto: ${costRows} linha(s), público: ${demo.length}`, "");
+    return text(`ok ${costRows}`);
   }
   // Script v2: hand back the sales with a gclid that Google has not received yet; the script uploads them.
   const since = new Date(Date.now() - 89 * 864e5).toISOString();
@@ -443,8 +463,8 @@ export async function googleCost(c, key) {
     time: new Date(Date.parse(r.at) - SP_OFFSET_H * 36e5).toISOString().replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2}).*$/, "$2/$3/$1 $4"),
     value: (r.amount_cents / 100).toFixed(2), currency: r.currency,
   }));
-  await logEvent(c.db, "google-ads", "ok", `script: gasto ${stmts.length} linha(s), ${conversions.length} venda(s) para enviar`, "");
-  return new Response(JSON.stringify({ ok: true, costs: stmts.length, conversion_name: s.gads_conv_name, conversions }), {
+  await logEvent(c.db, "google-ads", "ok", `script: gasto ${costRows} linha(s), público ${demo.length}, ${conversions.length} venda(s) para enviar`, "");
+  return new Response(JSON.stringify({ ok: true, costs: costRows, conversion_name: s.gads_conv_name, conversions }), {
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 }
@@ -541,7 +561,7 @@ export async function resultsPage(c) {
   const adGroup = byAd ? ", ad" : "";
   const srcSql = srcFilter ? " and coalesce(k.source, 'none') = ?" : "";
   // Every query goes to the database in one round trip (it is far away, so each trip costs).
-  const [clicks, convs, costs, nameRows, dRows, cRows, hasAnyRows, netRows, linkNets, pRows, prodNameRows, srcRows] = (await db.batch([
+  const [clicks, convs, costs, nameRows, dRows, cRows, hasAnyRows, netRows, linkNets, pRows, prodNameRows, srcRows, demoRows] = (await db.batch([
     db.prepare(
     `select source, coalesce(campaign, '') as campaign${adCol}, count(*) as n from tk_clicks
      where at >= ? and at < ?${netFilter ? " and link_id in (select id from links where network = ?)" : ""} group by source, campaign${adGroup}`,
@@ -577,7 +597,20 @@ export async function resultsPage(c) {
     ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs),
     db.prepare("select distinct product from tk_conversions where product is not null order by product limit 200"),
     db.prepare("select distinct source from tk_clicks"),
+    db.prepare(
+      "select dim, bucket, currency, sum(cost_cents) as cents, sum(clicks) as clicks, sum(conversions) as conv from tk_demo where date >= ? and date <= ? group by dim, bucket, currency",
+    ).bind(range.from, range.to),
   ])).map((r) => r.results || []);
+  const audience = { age: new Map(), gender: new Map() };
+  if (!srcFilter || srcFilter === "google") {
+    for (const r of demoRows) {
+      const mp = audience[r.dim];
+      if (!mp) continue;
+      const x = mp.get(r.bucket) || { bucket: r.bucket, cost: 0, clicks: 0, conv: 0 };
+      x.cost += T.convert(r.cents || 0, r.currency, s.currency, s); x.clicks += r.clicks; x.conv += r.conv;
+      mp.set(r.bucket, x);
+    }
+  }
   const names = Object.fromEntries(nameRows.map((r) => [r.k, r.name]));
 
   const rows = new Map();
@@ -660,7 +693,7 @@ export async function resultsPage(c) {
   const productNames = prodNameRows.map((r) => r.product);
   const sources = srcRows.map((r) => r.source);
   if (srcFilter && !sources.includes(srcFilter)) sources.push(srcFilter);
-  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, netFilter, prodFilter, list, tot, series, hasAny, sources, networks, products, productNames, money }));
+  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, netFilter, prodFilter, list, tot, series, hasAny, sources, networks, products, productNames, money, audience: { age: [...audience.age.values()], gender: [...audience.gender.values()] } }));
 }
 
 export async function salesPage(c) {
@@ -669,7 +702,7 @@ export async function salesPage(c) {
   const network = T.NETWORKS[c.url.searchParams.get("network")] ? c.url.searchParams.get("network") : "";
   const [sales, events, dayRows] = (await c.db.batch([
     c.db.prepare(
-      `select v.*, k.source, k.campaign, k.ad, k.keyword, k.country from tk_conversions v left join tk_clicks k on k.id = v.click_id
+      `select v.*, k.source, k.campaign, k.ad, k.keyword, coalesce(k.country, v.country) as country from tk_conversions v left join tk_clicks k on k.id = v.click_id
        where v.at >= ? and v.at < ?${network ? " and v.network = ?" : ""} order by v.at desc limit 300`,
     ).bind(range.start, range.end, ...(network ? [network] : [])),
     c.db.prepare("select * from tk_events order by id desc limit 40"),

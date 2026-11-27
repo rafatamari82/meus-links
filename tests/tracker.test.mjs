@@ -118,3 +118,19 @@ test("raw e-mail is valid MIME with encoded subject", async () => {
   assert.ok(m.includes("multipart/alternative"));
   assert.ok(m.endsWith("--\r\n"));
 });
+
+test("country comes from the postback when the network sends it", () => {
+  assert.equal(T.parsePostback("buygoods", { subid: "ctaaaaaaaaaa", amount: "10", country: "us" }).country, "US");
+  assert.equal(T.parsePostback("buygoods", { subid: "ctaaaaaaaaaa", amount: "10", country: "{COUNTRY}" }).country, null);
+  assert.equal(T.parsePostback("buygoods", { subid: "ctaaaaaaaaaa", amount: "10", country: "Brazil" }).country, null);
+  assert.equal(T.parsePostback("hotmart", {}, { event: "PURCHASE_APPROVED", data: { buyer: { address: { country_iso: "BR" } }, purchase: { transaction: "H1" } } }).country, "BR");
+  assert.equal(T.cleanCountry("XX"), null);
+});
+
+test("Google Ads script also sends age and gender", () => {
+  const js = T.googleAdsScript("https://app.example.com/cost/k/google");
+  assert.match(js, /age_range_view/);
+  assert.match(js, /gender_view/);
+  assert.match(js, /demo: demo/);
+  assert.doesNotThrow(() => new Function(js));
+});

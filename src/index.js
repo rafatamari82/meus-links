@@ -161,7 +161,8 @@ async function serveShort(c, slashtag) {
   const { db } = c;
   if (!["GET", "HEAD"].includes(c.req.method)) return c.respond("Método não permitido", 405, { "Content-Type": "text/plain" });
 
-  const domain = await db.prepare("select * from domains where full_name = ?").bind(c.host).first();
+  // The anti-robot switch rides along with the domain lookup, so a click costs no extra trip to the database.
+  const domain = await db.prepare("select d.*, (select value from settings where key = 'tk_antibot') as antibot from domains d where full_name = ?").bind(c.host).first();
   if (slashtag === ".well-known/shortlinks-verify") {
     if (!domain) return c.respond(V.publicNotFound(ASSET_VERSION), 404);
     return new Response(await domainToken(c.secret, c.host), {
@@ -194,11 +195,13 @@ async function serveShort(c, slashtag) {
 
   let target = link.destination;
   if (link.forward_parameters) target = core.forwardQuery(target, c.url.search);
+  const ua = (c.req.headers.get("User-Agent") || "").slice(0, 400);
+  const kind = core.botKind(ua, c.req.cf || { asn: Number(c.req.headers.get("X-Test-ASN")) || 0 });
+  const blockBot = kind === "bad" && domain.antibot !== "0";
 
   if (c.req.method === "GET") {
-    const ua = (c.req.headers.get("User-Agent") || "").slice(0, 400);
     const purpose = c.req.headers.get("Purpose") || c.req.headers.get("Sec-Purpose") || "";
-    const bot = core.isBot(ua) || purpose.startsWith("prefetch");
+    const bot = kind !== "human" || purpose.startsWith("prefetch");
     let ref = null;
     try {
       ref = new URL(c.req.headers.get("Referer") || "").hostname || null;
@@ -207,7 +210,7 @@ async function serveShort(c, slashtag) {
     const { device, os } = core.parseDevice(ua);
     const writes = [db.prepare(
       "insert into clicks (link_id, at, referrer_host, user_agent, is_bot, country, device, os, blocked) values (?,?,?,?,?,?,?,?,?)",
-    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, allowed ? 0 : 1)];
+    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, blockBot ? 2 : allowed ? 0 : 1)];
     if (!bot && allowed) {
       writes.push(db.prepare("update links set clicks = clicks + 1, last_click_at = ? where id = ?").bind(ts, link.id));
       if (link.track) {
@@ -218,6 +221,11 @@ async function serveShort(c, slashtag) {
     }
     // Record after answering: the visitor never waits for the database.
     c.exec.waitUntil(db.batch(writes).catch((e) => console.error("click not recorded", e)));
+  }
+  if (blockBot) {
+    return new Response("Acesso não permitido.", {
+      status: 403, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" },
+    });
   }
   if (!allowed) {
     return new Response(V.geoBlocked(ASSET_VERSION), {
@@ -479,7 +487,8 @@ async function linkStats(c, id) {
   const refs = (await c.db.prepare(
     "select coalesce(referrer_host, 'Direto ou desconhecido') as ref, count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 0 group by ref order by n desc limit 10",
   ).bind(id).all()).results;
-  const bots = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 1").bind(id).first()).n;
+  const bots = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 1 and blocked <> 2").bind(id).first()).n;
+  const robotsBlocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and blocked = 2").bind(id).first()).n;
   const blocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 1").bind(id).first()).n;
   const breakdown = async (col) => (await c.db.prepare(
     `select coalesce(${col}, '') as k, count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 0 group by k order by n desc limit 10`,
@@ -489,7 +498,7 @@ async function linkStats(c, id) {
   const systems = (await breakdown("os")).map((r) => ({ label: r.k || "Desconhecido", n: r.n }));
   const last30 = days.reduce((a, [, n]) => a + n, 0);
   return c.respond(V.statsView(c.view(), {
-    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, last30, countries, devices, systems,
+    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, robotsBlocked, last30, countries, devices, systems,
   }));
 }
 
@@ -638,7 +647,7 @@ const PANEL_ROUTES = [
   ["GET", /^\/sales$/, TR.salesPage],
   ["POST", /^\/sales\/([\w-]+)\/delete$/, TR.deleteSale],
   ["GET", /^\/settings$/, ST.settingsPage],
-  ["POST", /^\/settings\/(currency|refunds|mute|rate|email)$/, ST.settingsPost],
+  ["POST", /^\/settings\/(currency|refunds|mute|rate|email|antibot)$/, ST.settingsPost],
   ["GET", /^\/settings\/password$/, (c) => ST.passwordPage(c)],
   ["POST", /^\/settings\/password$/, ST.passwordPost],
   ["GET", /^\/tracking$/, (c) => TR.trackingPage(c)],

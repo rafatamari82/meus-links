@@ -54,6 +54,11 @@ export const SCHEMA = [
     cost_cents integer not null default 0, currency text not null default 'BRL',
     clicks integer not null default 0, impressions integer not null default 0, updated_at text not null,
     primary key (date, source, campaign_key))`,
+  `create table if not exists tk_demo (
+    date text not null, campaign_key text not null, dim text not null check (dim in ('age','gender')), bucket text not null,
+    cost_cents integer not null default 0, currency text not null default 'BRL', clicks integer not null default 0,
+    impressions integer not null default 0, conversions real not null default 0, updated_at text not null,
+    primary key (date, campaign_key, dim, bucket))`,
   `create table if not exists push_subs (
     id text primary key, endpoint text not null unique, p256dh text not null, auth text not null,
     label text, created_at text not null, last_ok_at text)`,
@@ -77,4 +82,5 @@ export const MIGRATIONS = [
   `alter table tk_conversions add column gads_sent_at text`,
   `alter table tk_conversions add column gads_tries integer`,
   `alter table tk_conversions add column gads_error text`,
+  `alter table tk_conversions add column country text`,
 ];

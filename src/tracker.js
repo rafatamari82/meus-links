@@ -161,6 +161,7 @@ export function parsePostback(network, fields, json) {
       currency: String(mine?.currency_value || pick(d, "purchase.price.currency_value") || net.currency).toUpperCase().slice(0, 3),
       upsell: pick(d, "purchase.order_bump.is_order_bump") === true,
       product: cleanProduct(pick(d, "product.name", "product.id")),
+      country: cleanCountry(pick(d, "buyer.address.country_iso", "buyer.address.country")),
     };
   }
 
@@ -178,6 +179,7 @@ export function parsePostback(network, fields, json) {
       amount_cents: cents == null ? null : Math.round(Number(cents)),
       currency: String(c.currency || c.product_base_price_currency || net.currency).toUpperCase().slice(0, 3),
       product: cleanProduct(pick(json, "Product.product_name", "product.name", "product_name")),
+      country: cleanCountry(pick(json, "Customer.country", "customer.country")),
     };
   }
 
@@ -196,7 +198,15 @@ export function parsePostback(network, fields, json) {
     currency: String(pick(f, "currency", "cur") || net.currency).replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3) || net.currency,
     product: cleanProduct(pick(f, "product", "product_name", "offer_name", "offer", "product_codename", "item", "sku")
       ?? (json ? pick(json, "product", "product_name", "offer_name") : null)),
+    country: cleanCountry(pick(f, "country", "country_code", "countrycode", "geo", "cc", "billing_country", "customer_country")
+      ?? (json ? pick(json, "country", "country_code") : null)),
   };
+}
+
+/** Two-letter country code as sent by the network, or null (unfilled macro, full name, unknown). */
+export function cleanCountry(raw) {
+  const s = String(raw ?? "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(s) && !["XX", "T1", "ZZ"].includes(s) ? s : null;
 }
 
 /** Product name as sent, or null when the network left the macro unfilled. */
@@ -290,7 +300,7 @@ export function normDate(raw) {
 /** Google Ads script the owner pastes in Tools > Scripts, scheduled hourly.
  * Sends cost per campaign, then uploads the sales Cutti hands back as offline conversions (no API token needed). */
 export function googleAdsScript(endpoint) {
-  return `// Cutti: manda o gasto por campanha e sobe as vendas para o Google Ads.
+  return `// Cutti: manda o gasto por campanha (e por idade e sexo) e sobe as vendas para o Google Ads.
 // Cole em Ferramentas > Ações em massa > Scripts, autorize e programe "A cada hora".
 var ENDPOINT = ${JSON.stringify(endpoint)};
 
@@ -311,11 +321,13 @@ function main() {
       cost_micros: Number(r.metrics.costMicros || 0), clicks: Number(r.metrics.clicks || 0), impressions: Number(r.metrics.impressions || 0)
     });
   }
+  var demo = [];
+  try { demo = audience(fmt(from), fmt(today)); } catch (e) { Logger.log("Idade e sexo: " + e); }
   var res = UrlFetchApp.fetch(ENDPOINT, {
     method: "post", contentType: "application/json", muteHttpExceptions: true,
-    payload: JSON.stringify({ currency: account.getCurrencyCode(), rows: rows, want_conversions: true })
+    payload: JSON.stringify({ currency: account.getCurrencyCode(), rows: rows, demo: demo, want_conversions: true })
   });
-  Logger.log("Gasto: " + res.getResponseCode() + " " + rows.length + " linha(s)");
+  Logger.log("Gasto: " + res.getResponseCode() + " " + rows.length + " linha(s), público: " + demo.length);
   if (res.getResponseCode() !== 200) return;
   var data = JSON.parse(res.getContentText());
   var list = data.conversions || [];
@@ -341,6 +353,28 @@ function main() {
     Logger.log("Erro ao enviar vendas: " + e);
     ack({ ids: [], error: String(e) });
   }
+}
+
+// Spend, clicks and conversions by age range and by gender (Google knows these; a link click does not).
+function audience(from, to) {
+  var sums = {};
+  var add = function (dim, view, field) {
+    var it = AdsApp.search("SELECT segments.date, campaign.id, ad_group_criterion." + field + ".type, metrics.cost_micros, metrics.clicks, " +
+      "metrics.impressions, metrics.conversions FROM " + view + " WHERE segments.date BETWEEN '" + from + "' AND '" + to + "'");
+    while (it.hasNext()) {
+      var r = it.next();
+      var bucket = r.adGroupCriterion[field === "age_range" ? "ageRange" : "gender"].type;
+      var k = r.segments.date + "|" + r.campaign.id + "|" + dim + "|" + bucket;
+      var x = sums[k] || (sums[k] = { date: r.segments.date, campaign_id: String(r.campaign.id), dim: dim, bucket: bucket, cost_micros: 0, clicks: 0, impressions: 0, conversions: 0 });
+      x.cost_micros += Number(r.metrics.costMicros || 0); x.clicks += Number(r.metrics.clicks || 0);
+      x.impressions += Number(r.metrics.impressions || 0); x.conversions += Number(r.metrics.conversions || 0);
+    }
+  };
+  add("age", "age_range_view", "age_range");
+  add("gender", "gender_view", "gender");
+  var out = [];
+  for (var k in sums) out.push(sums[k]);
+  return out;
 }
 
 function ack(body) {
@@ -411,3 +445,10 @@ export function renderTemplate(tpl, vars) {
   const out = String(tpl).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k] ?? "") : m));
   return out.split(/\s*·\s*/).map((x) => x.trim()).filter((x) => x && !/^(pedido|clique)$/i.test(x)).join(" · ").replace(/\s{2,}/g, " ").trim();
 }
+
+/** Google's age and gender buckets, in the order they are shown. */
+export const AGE_LABEL = {
+  AGE_RANGE_18_24: "18 a 24", AGE_RANGE_25_34: "25 a 34", AGE_RANGE_35_44: "35 a 44", AGE_RANGE_45_54: "45 a 54",
+  AGE_RANGE_55_64: "55 a 64", AGE_RANGE_65_UP: "65 ou mais", AGE_RANGE_UNDETERMINED: "Desconhecida",
+};
+export const GENDER_LABEL = { FEMALE: "Mulheres", MALE: "Homens", UNDETERMINED: "Desconhecido" };

@@ -371,7 +371,7 @@ function breakdownCard(title, rows, total) {
 </section>`;
 }
 
-export function statsView(c, { link, days, peak, refs, bots, blocked = 0, last30, countries = [], devices = [], systems = [] }) {
+export function statsView(c, { link, days, peak, refs, bots, blocked = 0, robotsBlocked = 0, last30, countries = [], devices = [], systems = [] }) {
   const su = `${c.scheme}://${link.domain_name}/${link.slashtag}`;
   const bars = days.map(([label, n], i) => {
     const h = n ? (n / peak) * 110 : 0;
@@ -410,6 +410,7 @@ export function statsView(c, { link, days, peak, refs, bots, blocked = 0, last30
   ${refs.length ? html`<table class="simple"><thead><tr><th scope="col">Origem</th><th scope="col" class="num">Cliques</th></tr></thead>
   <tbody>${refs.map((r) => html`<tr><td>${r.ref}</td><td class="num">${r.n}</td></tr>`)}</tbody></table>` : html`<p class="muted">Nada ainda.</p>`}
   ${blocked ? html`<p class="hint">${blocked} ${blocked === 1 ? "acesso de país bloqueado foi barrado e não entrou" : "acessos de países bloqueados foram barrados e não entraram"} na contagem.</p>` : ""}
+  ${robotsBlocked ? html`<p class="hint">${robotsBlocked} ${robotsBlocked === 1 ? "acesso de robô foi barrado" : "acessos de robôs foram barrados"} pelo filtro anti-robô.</p>` : ""}
   ${bots ? html`<p class="hint">${bots} ${bots === 1 ? "acesso de robôs e prévias de redes sociais não entrou" : "acessos de robôs e prévias de redes sociais não entraram"} na contagem.</p>` : ""}
 </section>`);
 }

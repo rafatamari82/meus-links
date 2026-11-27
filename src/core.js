@@ -90,6 +90,33 @@ export function cleanDomain(raw) {
   return d;
 }
 
+// Robots that must always reach the real destination: ad reviewers (Google, Microsoft, Meta,
+// NewsBreak...) and link previews in chat apps. Blocking or diverting these would look like cloaking.
+const GOOD_BOT_RE = new RegExp(
+  "google|adsbot|mediapartners|bingbot|adidxbot|bingpreview|msnbot|microsoftpreview|facebookexternalhit|facebookcatalog|" +
+  "meta-externalagent|meta-externalfetcher|facebot|whatsapp|telegram|slack|discord|twitter|linkedin|pinterest|" +
+  "skypeuripreview|applebot|newsbreak|yandex|duckduck|embedly|vkshare|quora link|bitlybot|snapchat|redditbot|iframely",
+  "i",
+);
+// Networks of the ad platforms themselves (Google, Microsoft, Meta): never blocked.
+const TRUSTED_ASN = new Set([15169, 8075, 32934]);
+// Hosting and cloud networks: a "browser" coming from here is almost always a script or a click farm.
+const HOSTING_ASN = new Set([16509, 14618, 396982, 14061, 16276, 24940, 63949, 20473, 51167, 31898, 45102, 37963, 132203, 12876, 60781, 16265, 9009, 212238, 62240, 202425, 40021, 36352, 55286, 46606, 19318]);
+
+/**
+ * "human" goes through and counts; "good" goes through without counting (reviewers, previews);
+ * "bad" is a robot the filter can block (scripts, empty agents, browsers from hosting networks).
+ */
+export function botKind(userAgent, cf = {}) {
+  const ua = String(userAgent || "");
+  const asn = Number(cf?.asn) || 0;
+  if (GOOD_BOT_RE.test(ua)) return "good";
+  if (TRUSTED_ASN.has(asn)) return isBot(ua) ? "good" : "human";
+  if (isBot(ua)) return "bad";
+  if (HOSTING_ASN.has(asn)) return "bad";
+  return "human";
+}
+
 export function isBot(userAgent) {
   const ua = userAgent || "";
   return !ua.trim() || BOT_RE.test(ua);
