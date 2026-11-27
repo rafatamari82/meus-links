@@ -786,7 +786,8 @@ class E2E(unittest.TestCase):
         m.get_by_role("link", name="adicionar plataforma").click()
         expect(m.get_by_role("heading", name="Adicionar plataforma")).to_be_visible()
         m.screenshot(path="/tmp/plat-grid.png")
-        tile = m.locator(".plat-tile", has_text="Digistore24")
+        tile = m.locator(".plat-tile", has=m.locator("input[value=digistore24]"))
+        expect(tile.get_by_role("img", name="Digistore24")).to_be_visible()  # official logo
         expect(tile.locator("input")).not_to_be_checked()
         tile.click()
         expect(tile.locator("input")).to_be_checked()
@@ -797,13 +798,13 @@ class E2E(unittest.TestCase):
         expect(box.get_by_label("URL de postback Digistore24")).to_have_value(re.compile(r"/pb/[^/]+/digistore24\?cid=\{cid\}"))
         m.screenshot(path="/tmp/plat-setup.png")
         m.get_by_role("link", name="Concluir").click()
-        expect(m.locator(".net-cards.mobile-only .net-card", has_text="Digistore24")).to_be_visible()
+        expect(m.locator(".net-cards.mobile-only .net-card").get_by_role("img", name="Digistore24")).to_be_visible()
         # taking one off removes its card (if it has no sales in the period)
         m.goto(self.base + "/platforms")
-        m.locator(".plat-tile", has_text="Digistore24").click()
+        m.locator(".plat-tile", has=m.locator("input[value=digistore24]")).click()
         m.get_by_role("button", name="Avançar").click()
         m.goto(self.base + "/results")
-        expect(m.locator(".net-cards.mobile-only .net-card", has_text="Digistore24")).to_have_count(0)
+        expect(m.locator(".net-cards.mobile-only .net-card").get_by_role("img", name="Digistore24")).to_have_count(0)
         m.context.close()
 
     def test_t11_google_script_uploads_sales(self):

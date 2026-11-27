@@ -466,3 +466,10 @@ a.set-row:hover { background: var(--color-surface); }
   .plat-bar { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); max-width: none; padding-top: var(--space-2); }
   .plat-next, .plat-bar .btn { min-height: 52px; border-radius: 999px; font-size: var(--text-base); }
 }
+
+/* Official platform logos */
+.net-logo { display: block; height: 24px; width: auto; max-width: 100%; }
+.net-card .net-logo { height: 24px; }
+.plat-tile .net-logo { height: 28px; max-width: 150px; object-fit: contain; }
+.plat-setup .net-logo { height: 26px; }
+.sr-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

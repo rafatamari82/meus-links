@@ -114,7 +114,7 @@ ${empty}
 </div>
 ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) => html`
   <a class="net-card" href="/sales?${new URLSearchParams({ ...base, network: n.network })}">
-    <span class="net-name"><span class="net-mark" aria-hidden="true">${(NETWORKS[n.network]?.name || n.network).slice(0, 1).toUpperCase()}</span>${NETWORKS[n.network]?.name || n.network}</span>
+    <span class="net-name">${netBrand(n.network, c.assetVersion)}</span>
     <span class="net-value">${m(n.revenue)}</span>
     <span class="net-sub">${n.sales} ${n.sales === 1 ? "venda" : "vendas"} · ${n.refunds} reembolso(s)</span>
     <svg class="net-chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
@@ -223,6 +223,14 @@ function audienceSection(audience, m) {
 }
 
 const netMark = (name) => html`<span class="net-mark" aria-hidden="true">${name.slice(0, 1).toUpperCase()}</span>`;
+// Official logos sent by the owner (static/net-<key>.png); the others show an initial and the name.
+const NET_LOGOS = new Set(["hotmart", "kiwify", "clickbank", "buygoods", "digistore24", "maxweb", "gurumedia", "smartadv"]);
+const netBrand = (k, v) => {
+  const name = NETWORKS[k]?.name || k;
+  return NET_LOGOS.has(k)
+    ? html`<img class="net-logo" src="/static/net-${k}.png?v=${v}" alt="${name}">`
+    : html`${netMark(name)}<span>${name}</span>`;
+};
 
 export function platformsView(c, { selected }) {
   const nets = Object.entries(NETWORKS).filter(([k]) => k !== "other");
@@ -234,7 +242,7 @@ export function platformsView(c, { selected }) {
   <div class="plat-grid">${nets.map(([k, n]) => html`
     <label class="plat-tile">
       <input type="checkbox" name="net" value="${k}" ${selected.includes(k) ? raw("checked") : ""}>
-      <span class="plat-name">${netMark(n.name)}${n.name}</span>
+      <span class="plat-name">${netBrand(k, c.assetVersion)}</span>
       <span class="plat-check" aria-hidden="true">✓</span>
     </label>`)}</div>
   <p class="hint">Usa outra plataforma, como Braip, Monetizze ou Perfect Pay? Mande o postback dela que ela entra nesta lista.</p>
@@ -253,7 +261,7 @@ export function platformsSetupView(c, { s, base, selected, added }) {
 <header class="page-head"><div><h1 class="h-xl">${added.length ? "Falta só o postback" : "Postbacks das plataformas"}</h1>
   <p class="muted">Copie a URL de cada plataforma e cole no painel dela. É assim que a venda chega no Cutti.</p></div></header>
 ${show.map((k) => html`<section class="card pad plat-setup">
-  <h2 class="h-md">${netMark(NETWORKS[k].name)} ${NETWORKS[k].name}</h2>
+  <h2 class="h-md">${netBrand(k, c.assetVersion)}</h2>
   <div class="copy-row"><input value="${pb(k)}" readonly aria-label="URL de postback ${NETWORKS[k].name}" spellcheck="false"><button class="btn btn-secondary btn-sm" type="button" data-copy="${pb(k)}">Copiar</button></div>
   <p class="hint">${WHERE[k] || ""}</p>
   <p class="hint">No link do anúncio: abra o link no Encurtador, ligue <strong>Rastrear vendas</strong> e escolha ${NETWORKS[k].name}.</p>
