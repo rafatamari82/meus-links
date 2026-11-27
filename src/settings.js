@@ -42,7 +42,8 @@ function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
   </form>
   <div class="set-row"><span class="set-label">Dólar hoje<span class="hint">${s.rate_auto ? (s.rate_at ? `comercial · ${fmtDateTime(s.rate_at)}` : "ainda não atualizado") : "digitado à mão"}</span></span>
     <span class="set-value">R$ ${s.usd_brl.toFixed(4).replace(".", ",")}</span></div>
-  ${s.rate_auto ? html`<form method="post" action="/settings/rate" class="set-row">${csrfField(c)}<button class="set-link" type="submit">Atualizar cotação agora</button></form>` : ""}
+  ${s.rate_auto ? html`<form method="post" action="/settings/rate" class="set-row">${csrfField(c)}<span class="set-label">Cotação</span>
+    <button class="btn btn-primary btn-sm btn-icon" type="submit">${raw('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>')}Atualizar agora</button></form>` : ""}
 </div>
 <p class="set-note">Dólar comercial do momento${s.rate_src ? ` (fonte: ${s.rate_src})` : ""}, atualizado a cada 15 minutos. Apps de banco e de câmbio podem mostrar um pouco acima, porque somam a margem deles.${s.rate_err ? ` Falhas na última busca: ${s.rate_err}.` : ""}</p>
 

@@ -604,7 +604,7 @@ class E2E(unittest.TestCase):
         m.get_by_role("navigation", name="Navegação principal").get_by_role("link", name="Ajustes").click()
         expect(m.get_by_role("heading", name="Ajustes", exact=True)).to_be_visible()
         expect(m.get_by_text("R$ 5,4000")).to_be_visible()
-        m.get_by_role("button", name="Atualizar cotação agora").click()
+        m.get_by_role("button", name="Atualizar agora").click()
         expect(m.get_by_text("Dólar atualizado: R$ 5,4000.")).to_be_visible()
         m.get_by_role("button", name="Dólar").click()
         expect(m.get_by_role("button", name="Dólar")).to_have_attribute("aria-pressed", "true")
