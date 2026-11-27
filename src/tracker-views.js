@@ -405,7 +405,7 @@ const WHERE = {
 
 function notifySection(c, s, tgError, devices) {
   const tgOn = s.tg_token && s.tg_chat;
-  const any = s.ntfy_topic || tgOn || devices.length;
+  const any = tgOn || devices.length;
   return html`
 <section class="card pad" id="avisos">
   <h2 class="h-lg">Avisos de venda no celular</h2>
@@ -427,20 +427,6 @@ function notifySection(c, s, tgError, devices) {
       </form>
       ${devices.length ? html`<table class="simple"><tbody>${devices.map((d) => html`<tr><td>${d.label || "Aparelho"}<div class="hint">ativado em ${fmtDateTime(d.created_at)}${d.last_ok_at ? ` · último aviso ${fmtDateTime(d.last_ok_at)}` : ""}</div></td>
         <td class="actions-cell"><form method="post" action="/integrations/push-delete-${d.id}">${csrfField(c)}<button class="btn btn-ghost btn-xs danger-text" type="submit">Remover</button></form></td></tr>`)}</tbody></table>` : ""}
-    </div>
-    <div class="notify-box">
-      <h3 class="h-md">App ntfy ${s.ntfy_topic ? html`<span class="badge badge-success">Ligado</span>` : ""}</h3>
-      ${s.ntfy_topic ? html`
-      <ol class="steps">
-        <li>Instale o app <strong>ntfy</strong> (App Store ou Google Play). Não precisa criar conta.</li>
-        <li>No app, toque em <strong>+</strong> e inscreva-se neste tópico:</li>
-      </ol>
-      <div class="copy-row"><input value="${s.ntfy_topic}" readonly aria-label="Tópico do ntfy" spellcheck="false"><button class="btn btn-secondary btn-sm" type="button" data-copy="${s.ntfy_topic}">Copiar</button></div>
-      <p class="hint">Quem souber o nome do tópico vê os avisos. Não compartilhe.</p>
-      <form method="post" action="/integrations/ntfy">${csrfField(c)}<input type="hidden" name="off" value="1"><button class="btn btn-ghost btn-xs danger-text" type="submit">Desligar</button></form>`
-    : html`
-      <p class="hint">O jeito mais rápido: um app de notificações, sem conta e sem configurar nada.</p>
-      <form method="post" action="/integrations/ntfy">${csrfField(c)}<button class="btn btn-primary" type="submit">Ativar ntfy</button></form>`}
     </div>
     <div class="notify-box">
       <h3 class="h-md">Telegram ${tgOn ? html`<span class="badge badge-success">Ligado${s.tg_name ? ` · @${s.tg_name}` : ""}</span>` : ""}</h3>

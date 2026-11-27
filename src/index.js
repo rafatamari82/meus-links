@@ -646,7 +646,7 @@ const PANEL_ROUTES = [
   ["GET", /^\/tracking\/google\/callback$/, GA.googleCallback],
   ["POST", /^\/tracking\/google\/(credentials|customer|sync|disconnect|forget)$/, GA.googlePost],
   ["GET", /^\/integrations$/, (c) => TR.integrationsPage(c)],
-  ["POST", /^\/integrations\/(settings|awesome-token|tracking-settings|key|newsbreak-csv|cost|ntfy|telegram|notify-test|notify-prefs|templates|push-subscribe|push-delete-[\w-]+)$/, TR.integrationsPost],
+  ["POST", /^\/integrations\/(settings|awesome-token|tracking-settings|key|newsbreak-csv|cost|telegram|notify-test|notify-prefs|templates|push-subscribe|push-delete-[\w-]+)$/, TR.integrationsPost],
   ["GET", /^\/domains$/, (c) => domainsPage(c)],
   ["POST", /^\/domains$/, addDomain],
   ["POST", /^\/domains\/([\w-]+)\/verify$/, verifyDomain],

@@ -35,7 +35,6 @@ export async function getSettings(db) {
     eur_brl: Number(s.eur_brl) > 0 ? Number(s.eur_brl) : 6.2,
     nb_postback: s.nb_postback || "",
     gads_conv_name: s.gads_conv_name || "Cutti - Venda",
-    ntfy_topic: s.ntfy_topic || "",
     tg_token: s.tg_token || "",
     tg_chat: s.tg_chat || "",
     tg_name: s.tg_name || "",
@@ -304,12 +303,7 @@ export async function notify(db, s, m, fetcher = fetch, { email = null, panel = 
       }));
     }
   }
-  if (s.ntfy_topic) {
-    jobs.push(fetcher("https://ntfy.sh/", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic: s.ntfy_topic, title: m.title, message: m.body, priority: m.refund ? 3 : 4, tags: [m.refund ? "warning" : "moneybag"] }),
-    }).then((r) => (r.ok ? null : `ntfy respondeu ${r.status}`)));
-  }
+
   if (s.tg_token && s.tg_chat) {
     jobs.push(fetcher(`https://api.telegram.org/bot${s.tg_token}/sendMessage`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -723,15 +717,6 @@ export async function integrationsPost(c, action) {
     await setSetting(c.db, "nb_postback", nb.slice(0, 1000));
     await setSetting(c.db, "gads_conv_name", String(f.get("gads_conv_name") || "").trim().slice(0, 100) || "Cutti - Venda");
     c.flash("success", "Salvo.");
-  } else if (action === "ntfy") {
-    const s = await getSettings(c.db);
-    if (f.get("off")) {
-      await setSetting(c.db, "ntfy_topic", "");
-      c.flash("success", "Avisos pelo ntfy desligados.");
-    } else {
-      if (!s.ntfy_topic) await setSetting(c.db, "ntfy_topic", `cutti-${randomToken(12).replace(/[^A-Za-z0-9]/g, "x")}`);
-      c.flash("success", "Tópico criado. Inscreva-se nele no app ntfy e toque em Testar.");
-    }
   } else if (action === "telegram") {
     if (f.get("off")) {
       for (const k of ["tg_token", "tg_chat", "tg_name"]) await setSetting(c.db, k, "");
