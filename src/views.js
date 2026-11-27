@@ -371,7 +371,7 @@ function breakdownCard(title, rows, total) {
 </section>`;
 }
 
-export function statsView(c, { link, days, peak, refs, bots, blocked = 0, robotsBlocked = 0, last30, countries = [], devices = [], systems = [] }) {
+export function statsView(c, { link, days, peak, refs, bots, blocked = 0, robotsBlocked = 0, robots = [], last30, countries = [], devices = [], systems = [] }) {
   const su = `${c.scheme}://${link.domain_name}/${link.slashtag}`;
   const bars = days.map(([label, n], i) => {
     const h = n ? (n / peak) * 110 : 0;
@@ -412,8 +412,23 @@ export function statsView(c, { link, days, peak, refs, bots, blocked = 0, robots
   ${blocked ? html`<p class="hint">${blocked} ${blocked === 1 ? "acesso de país bloqueado foi barrado e não entrou" : "acessos de países bloqueados foram barrados e não entraram"} na contagem.</p>` : ""}
   ${robotsBlocked ? html`<p class="hint">${robotsBlocked} ${robotsBlocked === 1 ? "acesso de robô foi barrado" : "acessos de robôs foram barrados"} pelo filtro anti-robô.</p>` : ""}
   ${bots ? html`<p class="hint">${bots} ${bots === 1 ? "acesso de robôs e prévias de redes sociais não entrou" : "acessos de robôs e prévias de redes sociais não entraram"} na contagem.</p>` : ""}
-</section>`);
+</section>
+${robots.length ? html`<section class="card table-wrap robots">
+  <h2 class="h-md pad-x">Acessos de robôs</h2>
+  <p class="hint pad-x">Os últimos ${robots.length}. O IP e o local são guardados só dos robôs, nunca das pessoas.</p>
+  <table class="simple robot-table"><thead><tr><th scope="col">Quando</th><th scope="col">IP</th><th scope="col">Local</th><th scope="col">Rede</th><th scope="col">Situação</th><th scope="col">Navegador</th></tr></thead>
+  <tbody>${robots.map((r) => html`<tr>
+    <td data-label="Quando">${fmtDateTime(r.at)}</td>
+    <td data-label="IP" class="mono">${r.ip || "—"}</td>
+    <td data-label="Local">${[r.city, r.region, r.country && countryName(r.country)].filter(Boolean).join(", ") || "—"}</td>
+    <td data-label="Rede">${r.as_org || "—"}${r.asn ? html` <span class="hint">AS${r.asn}</span>` : ""}</td>
+    <td data-label="Situação">${r.blocked === 2 ? html`<span class="badge badge-warning">Barrado</span>` : html`<span class="badge">Liberado</span>`}</td>
+    <td data-label="Navegador" class="ua-cell" title="${r.user_agent || ""}">${(r.user_agent || "(vazio)").slice(0, 60)}${(r.user_agent || "").length > 60 ? "…" : ""}</td>
+  </tr>`)}</tbody></table>
+  <p class="hint pad-x">Liberado: robôs do Google, NewsBreak e prévias de redes sociais (ou o filtro estava desligado). Não contam como clique.</p>
+</section>` : ""}`);
 }
+
 
 export function domainsView(c, { domains, counts, error, value, panelHost }) {
   return page({ ...c, section: "domains" }, "Domínios", html`

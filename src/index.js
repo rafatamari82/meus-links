@@ -208,9 +208,19 @@ async function serveShort(c, slashtag) {
     } catch { /* no referrer */ }
     const ts = now();
     const { device, os } = core.parseDevice(ua);
+    // Where robots come from (IP, place, network) is kept for robots only; people's IPs are never stored.
+    const cf = c.req.cf || {};
+    const rob = bot ? {
+      ip: (c.req.headers.get("CF-Connecting-IP") || "").slice(0, 64) || null,
+      city: (cf.city || c.req.headers.get("X-Test-City") || "").slice(0, 80) || null,
+      region: (cf.region || "").slice(0, 80) || null,
+      asn: Number(cf.asn || c.req.headers.get("X-Test-ASN")) || null,
+      org: (cf.asOrganization || c.req.headers.get("X-Test-Org") || "").slice(0, 120) || null,
+    } : {};
     const writes = [db.prepare(
-      "insert into clicks (link_id, at, referrer_host, user_agent, is_bot, country, device, os, blocked) values (?,?,?,?,?,?,?,?,?)",
-    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, blockBot ? 2 : allowed ? 0 : 1)];
+      "insert into clicks (link_id, at, referrer_host, user_agent, is_bot, country, device, os, blocked, ip, city, region, asn, as_org) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, blockBot ? 2 : allowed ? 0 : 1,
+      rob.ip ?? null, rob.city ?? null, rob.region ?? null, rob.asn ?? null, rob.org ?? null)];
     if (!bot && allowed) {
       writes.push(db.prepare("update links set clicks = clicks + 1, last_click_at = ? where id = ?").bind(ts, link.id));
       if (link.track) {
@@ -489,6 +499,9 @@ async function linkStats(c, id) {
   ).bind(id).all()).results;
   const bots = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 1 and blocked <> 2").bind(id).first()).n;
   const robotsBlocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and blocked = 2").bind(id).first()).n;
+  const robots = (await c.db.prepare(
+    "select at, ip, city, region, country, asn, as_org, user_agent, blocked from clicks where link_id = ? and is_bot = 1 order by id desc limit 50",
+  ).bind(id).all()).results;
   const blocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 1").bind(id).first()).n;
   const breakdown = async (col) => (await c.db.prepare(
     `select coalesce(${col}, '') as k, count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 0 group by k order by n desc limit 10`,
@@ -498,7 +511,7 @@ async function linkStats(c, id) {
   const systems = (await breakdown("os")).map((r) => ({ label: r.k || "Desconhecido", n: r.n }));
   const last30 = days.reduce((a, [, n]) => a + n, 0);
   return c.respond(V.statsView(c.view(), {
-    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, robotsBlocked, last30, countries, devices, systems,
+    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, robotsBlocked, robots, last30, countries, devices, systems,
   }));
 }
 

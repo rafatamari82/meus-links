@@ -171,7 +171,7 @@ class E2E(unittest.TestCase):
         p = self.page
         chrome = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36"
         get = lambda ua, asn=0: p.request.get(self.base + "/robocheck", max_redirects=0,
-                                              headers={"User-Agent": ua, "X-Test-ASN": str(asn)}).status
+                                              headers={"User-Agent": ua, "X-Test-ASN": str(asn), "X-Test-City": "Ashburn", "X-Test-Org": "Amazon.com, Inc.", "CF-IPCountry": "US"}).status
         self.assertEqual(get("curl/8.4.0"), 403)
         self.assertEqual(get("python-requests/2.31"), 403)
         self.assertEqual(get(chrome, 16509), 403)          # browser on a cloud server
@@ -181,6 +181,17 @@ class E2E(unittest.TestCase):
         self.assertEqual(self.clicks_for("robocheck"), 1)
         p.get_by_role("link", name=re.compile(r"^Estatísticas de robocheck:")).click()
         expect(p.get_by_text("3 acessos de robôs foram barrados pelo filtro anti-robô.")).to_be_visible()
+        rob = p.locator("section.robots")
+        expect(rob.get_by_role("heading", name="Acessos de robôs")).to_be_visible()
+        row = rob.locator("tbody tr", has_text="python-requests")
+        expect(row.locator("td[data-label=IP]")).to_have_text(re.compile(r"127\.0\.0\.1|::1"))  # the dev server's connection IP
+        expect(row).to_contain_text("Estados Unidos")
+        expect(row).to_contain_text("Ashburn")
+        expect(row).to_contain_text("Amazon.com, Inc.")
+        expect(row).to_contain_text("Barrado")
+        expect(rob.locator("tbody tr", has_text="AdsBot-Google")).to_contain_text("Liberado")
+        expect(rob.locator("tbody tr")).to_have_count(5)  # the person's click is not listed
+        rob.screenshot(path="/tmp/robots.png")
         # switch it off: robots go through again (and still do not count)
         p.goto(self.base + "/settings")
         p.get_by_label(re.compile("^Barrar robôs")).uncheck()
