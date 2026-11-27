@@ -407,15 +407,23 @@ export const PRESELL_JS = `(function(){
 // ---------------------------------------------------------------- notification text
 
 export const TEMPLATE_DEFAULTS = {
-  sale_title: "{emoji} {tipo}! {valor}",
-  sale_body: "{produto} · {pais} · {rede} · {origem} · {campanha}",
-  refund_title: "{emoji} {tipo} {valor}",
-  refund_body: "{produto} · {rede} · pedido {pedido}",
+  sale_title: "Cutti informa 🤑🚀",
+  sale_body: "Venda realizada na {rede}: {valor_curto}",
+  refund_title: "Cutti informa {emoji}",
+  refund_body: "{tipo} na {rede}: {valor_curto}",
 };
+
+/** "105 USD", "87,50 USD": the amount and the currency code, like the sale notices of other trackers. */
+export function shortAmount(cents, currency) {
+  const v = Math.abs(Number(cents) || 0) / 100;
+  const num = Number.isInteger(v) ? String(v) : v.toFixed(2).replace(".", ",");
+  return `${num.replace(/\B(?=(\d{3})+(?!\d))/g, ".")} ${String(currency || "USD").toUpperCase()}`;
+}
 
 export const TEMPLATE_VARS = {
   emoji: "💰 nas vendas, ↩️ no reembolso, ⚠️ no chargeback",
   tipo: "Venda, Upsell, Reembolso ou Chargeback",
+  valor_curto: "valor e moeda, curto (87,50 USD)",
   valor: "valor na moeda da rede (US$ 87,50)",
   valor_painel: "valor convertido para a moeda do painel (R$ 472,50)",
   rede: "ClickBank, BuyGoods…",
@@ -431,7 +439,7 @@ export const TEMPLATE_VARS = {
 };
 
 export const SAMPLE_VARS = {
-  emoji: "💰", tipo: "Venda", valor: "US$ 87,50", valor_painel: "R$ 472,50", rede: "ClickBank", origem: "Google Ads",
+  emoji: "💰", tipo: "Venda", valor_curto: "87,50 USD", valor: "US$ 87,50", valor_painel: "R$ 472,50", rede: "ClickBank", origem: "Google Ads",
   campanha: "Campanha exemplo", anuncio: "Anúncio 3", produto: "SodaPeak", pais: "🇺🇸 Estados Unidos", palavra: "receita de bolo", pedido: "ABC123", hoje: "4", total_hoje: "R$ 1.890,00",
 };
 

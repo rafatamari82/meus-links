@@ -580,7 +580,9 @@ class E2E(unittest.TestCase):
         expect(p.locator("#tpl-sale_title")).to_have_value("🤑 Caiu {valor_painel}")
         p.locator("summary", has_text="Personalizar o texto do aviso").click()
         p.get_by_role("button", name="Voltar ao padrão").click()
-        expect(p.locator("#tpl-sale_title")).to_have_value("{emoji} {tipo}! {valor}")
+        expect(p.locator("#tpl-sale_title")).to_have_value("Cutti informa 🤑🚀")
+        expect(p.locator("#tpl-sale_body")).to_have_value("Venda realizada na {rede}: {valor_curto}")
+        expect(p.locator('[data-preview="sale"] [data-preview-body]')).to_have_text("Venda realizada na ClickBank: 87,50 USD")
 
     def test_t07_organic_youtube_video(self):
         p = self.page

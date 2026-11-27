@@ -74,10 +74,11 @@ test("cost CSV", () => {
 
 test("notification templates", () => {
   const v = { emoji: "💰", tipo: "Venda", valor: "US$ 10,00", rede: "ClickBank", origem: "Google Ads", campanha: "", anuncio: "A1", pedido: "", produto: "", pais: "" };
-  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_title, v), "💰 Venda! US$ 10,00");
-  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_body, v), "ClickBank · Google Ads");
-  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_body, { ...v, produto: "SodaPeak", campanha: "C1", pais: "🇺🇸 Estados Unidos" }), "SodaPeak · 🇺🇸 Estados Unidos · ClickBank · Google Ads · C1");
-  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.refund_body, v), "ClickBank");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_title, v), "Cutti informa 🤑🚀");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_body, { ...v, valor_curto: "10 USD" }), "Venda realizada na ClickBank: 10 USD");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.refund_title, { ...v, emoji: "↩️" }), "Cutti informa ↩️");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.refund_body, { ...v, tipo: "Reembolso", valor_curto: "10 USD" }), "Reembolso na ClickBank: 10 USD");
+  assert.equal(T.renderTemplate("{produto} · {pais} · {rede}", { ...v, produto: "SodaPeak" }), "SodaPeak · ClickBank");
   assert.equal(T.renderTemplate("Caiu {valor} {desconhecida}", v), "Caiu US$ 10,00 {desconhecida}");
   assert.equal(T.cleanTemplate("  ", "x"), "x");
 });
@@ -145,4 +146,11 @@ test("ClickBank and Digistore24 send the buyer's country", () => {
   assert.match(T.NETWORKS.clickbank.query, /country=\{country\}/);
   assert.match(T.NETWORKS.digistore24.query, /country=\{country\}/);
   assert.equal(T.parsePostback("clickbank", { cid: "ctaaaaaaaaaa", amount: "50", txid: "R1", country: "US" }).country, "US");
+});
+
+test("short amount like other trackers: 105 USD", () => {
+  assert.equal(T.shortAmount(10500, "usd"), "105 USD");
+  assert.equal(T.shortAmount(8750, "USD"), "87,50 USD");
+  assert.equal(T.shortAmount(123456700, "BRL"), "1.234.567 BRL");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_body, { rede: "SmashLoud", valor_curto: "105 USD" }), "Venda realizada na SmashLoud: 105 USD");
 });

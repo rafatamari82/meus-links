@@ -18,6 +18,16 @@ export async function getSettings(db) {
     await db.prepare("insert or ignore into settings (key, value) values ('tk_key', ?)").bind(randomToken(24)).run();
     s.key = (await db.prepare("select value from settings where key = 'tk_key'").first()).value;
   }
+  // One time (Nov/2026): the owner asked for the "Cutti informa 🤑🚀 / Venda realizada na {rede}: {valor_curto}" notice,
+  // so any older custom text gives way to the new standard once. Later edits are kept.
+  if (s.tpl_v2 !== "1") {
+    await db.batch([
+      ...["sale_title", "sale_body", "refund_title", "refund_body"].map((k) => db.prepare("delete from settings where key = ?").bind(`tk_tpl_${k}`)),
+      db.prepare("insert into settings (key, value) values ('tk_tpl_v2', '1') on conflict(key) do update set value = '1'"),
+    ]);
+    for (const k of ["sale_title", "sale_body", "refund_title", "refund_body"]) delete s[`tpl_${k}`];
+    s.tpl_v2 = "1";
+  }
   if (!s.vapid_pub || !s.vapid_priv) {
     const k = await newVapidKeys();
     await db.batch([
@@ -265,6 +275,7 @@ async function saleMessage(db, s, network, p, click) {
     emoji: { sale: "💰", upsell: "💰", refund: "↩️", chargeback: "⚠️" }[p.type],
     tipo: { sale: "Venda", upsell: "Upsell", refund: "Reembolso", chargeback: "Chargeback" }[p.type],
     valor: T.fmtMoney(p.amount_cents || 0, p.currency || "USD"),
+    valor_curto: T.shortAmount(p.amount_cents || 0, p.currency || "USD"),
     valor_painel: T.fmtMoney(T.convert(p.amount_cents || 0, p.currency || "USD", s.currency, s), s.currency),
     rede: T.NETWORKS[network]?.name || network,
     origem: click ? (T.SOURCES[click.source] || click.source) : "sem clique rastreado",
