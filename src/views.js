@@ -25,7 +25,7 @@ const dateTimeFmt = new Intl.DateTimeFormat("pt-BR", {
 export const fmtDate = (iso) => (iso ? dateFmt.format(new Date(iso)) : "—");
 export const fmtDateTime = (iso) => (iso ? dateTimeFmt.format(new Date(iso)).replace(",", "") : "—");
 
-const ICON = raw('<img class="brand-logo" src="/static/ga-64.png" alt="" width="28" height="28">');
+const ICON = raw('<img class="brand-logo" src="/static/gr-64.png" alt="" width="28" height="28">');
 export const csrfField = (c) => html`<input type="hidden" name="csrf" value="${c.csrf}">`;
 
 function head(title, assetVersion) {
@@ -38,13 +38,13 @@ function head(title, assetVersion) {
   <title>${title} · Gringa Ads</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=${assetVersion}">
   <meta name="theme-color" content="#03384b">
-  <link rel="apple-touch-icon" href="/static/ga-apple-180.png">
+  <link rel="apple-touch-icon" href="/static/gr-apple-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Gringa Ads">
   <link rel="stylesheet" href="/static/tokens.css?v=${assetVersion}">
   <link rel="stylesheet" href="/static/app.css?v=${assetVersion}">
-  <link rel="icon" href="/static/ga-64.png" type="image/png">
+  <link rel="icon" href="/static/gr-64.png" type="image/png">
   <script src="/static/app.js?v=${assetVersion}" defer></script>
 </head>`;
 }

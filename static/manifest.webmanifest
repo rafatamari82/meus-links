@@ -9,8 +9,8 @@
   "background_color": "#03384b",
   "theme_color": "#03384b",
   "icons": [
-    { "src": "/static/ga-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/static/ga-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/static/ga-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/static/gr-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/gr-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/gr-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

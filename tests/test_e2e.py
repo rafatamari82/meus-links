@@ -542,7 +542,7 @@ class E2E(unittest.TestCase):
     def test_t05_cutti_app_install_and_push(self):
         p = self.page
         self.assertEqual(p.request.get(self.base + "/static/manifest.webmanifest").json()["name"], "Gringa Ads")
-        icon = p.request.get(self.base + "/static/ga-192.png")
+        icon = p.request.get(self.base + "/static/gr-192.png")
         self.assertEqual(icon.headers["content-type"], "image/png")
         self.assertEqual(icon.body()[:4], b"\x89PNG")
         self.assertIn("showNotification", p.request.get(self.base + "/sw.js").text())
