@@ -71,8 +71,7 @@ export function page(c, title, body) {
   ${tabItem("/results", "Resumo", TAB_ICONS.home, c.section === "results")}
   ${tabItem("/sales", "Vendas", TAB_ICONS.list, c.section === "sales")}
   ${tabItem("/links", "Links", TAB_ICONS.link, c.section === "links")}
-  ${tabItem("/tracking", "Trackeamento", TAB_ICONS.target, c.section === "tracking")}
-  ${tabItem("/settings", "Ajustes", TAB_ICONS.gear, ["settings", "integrations", "domains"].includes(c.section))}
+  ${tabItem("/settings", "Ajustes", TAB_ICONS.gear, ["settings", "integrations", "domains", "tracking"].includes(c.section))}
 </nav>
 <div class="sr-only" aria-live="polite" id="live"></div>
 </body></html>`.s;
