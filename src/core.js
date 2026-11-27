@@ -103,6 +103,19 @@ const TRUSTED_ASN = new Set([15169, 8075, 32934]);
 // Hosting and cloud networks: a "browser" coming from here is almost always a script or a click farm.
 const HOSTING_ASN = new Set([16509, 14618, 396982, 14061, 16276, 24940, 63949, 20473, 51167, 31898, 45102, 37963, 132203, 12876, 60781, 16265, 9009, 212238, 62240, 202425, 40021, 36352, 55286, 46606, 19318]);
 
+// Networks used by commercial VPNs and proxies (NordVPN, Surfshark, ProtonVPN, Mullvad, ExpressVPN and others rent
+// servers here), plus the big cloud hosts. Used by the per-link "Barrar VPN" switch. Not exhaustive: residential
+// proxies look like home internet and still pass; Apple's iCloud Private Relay is deliberately not listed.
+const VPN_ASN = new Set([
+  ...HOSTING_ASN,
+  60068, 136787, 147049, 207137, 39351, 209854, 209103, 51852, 49981, 50673, 8100, 46562, 40676, 53667, 44477,
+  25369, 206264, 200651, 56630, 58065, 197540, 3223, 35913, 54825, 32613, 30633, 7979, 13213,
+]);
+export function isVpnNetwork(cf = {}) {
+  const asn = Number(cf?.asn) || 0;
+  return !TRUSTED_ASN.has(asn) && VPN_ASN.has(asn);
+}
+
 /**
  * "human" goes through and counts; "good" goes through without counting (reviewers, previews);
  * "bad" is a robot the filter can block (scripts, empty agents, browsers from hosting networks).

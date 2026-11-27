@@ -191,13 +191,16 @@ async function serveShort(c, slashtag) {
 
   // Cloudflare fills request.cf; the header is only a fallback for local runs.
   const country = (c.req.cf?.country || (c.req.cf ? "" : c.req.headers.get("CF-IPCountry")) || "").toUpperCase().slice(0, 2) || null;
-  const allowed = core.geoAllows(link.geo_mode, link.geo_countries, country);
 
   let target = link.destination;
   if (link.forward_parameters) target = core.forwardQuery(target, c.url.search);
   const ua = (c.req.headers.get("User-Agent") || "").slice(0, 400);
-  const kind = core.botKind(ua, c.req.cf || { asn: Number(c.req.headers.get("X-Test-ASN")) || 0 });
+  const cfNet = c.req.cf || { asn: Number(c.req.headers.get("X-Test-ASN")) || 0 };
+  const kind = core.botKind(ua, cfNet);
   const blockBot = kind === "bad" && domain.antibot !== "0";
+  // "Barrar VPN" on this link: VPN/proxy networks see the same "not here" page as a blocked country.
+  const blockVpn = !blockBot && link.block_vpn && kind !== "good" && core.isVpnNetwork(cfNet);
+  const allowed = core.geoAllows(link.geo_mode, link.geo_countries, country) && !blockVpn;
 
   if (c.req.method === "GET") {
     const purpose = c.req.headers.get("Purpose") || c.req.headers.get("Sec-Purpose") || "";
@@ -210,7 +213,7 @@ async function serveShort(c, slashtag) {
     const { device, os } = core.parseDevice(ua);
     // Where robots come from (IP, place, network) is kept for robots only; people's IPs are never stored.
     const cf = c.req.cf || {};
-    const rob = bot ? {
+    const rob = bot || blockVpn ? {
       ip: (c.req.headers.get("CF-Connecting-IP") || "").slice(0, 64) || null,
       city: (cf.city || c.req.headers.get("X-Test-City") || "").slice(0, 80) || null,
       region: (cf.region || "").slice(0, 80) || null,
@@ -219,7 +222,7 @@ async function serveShort(c, slashtag) {
     } : {};
     const writes = [db.prepare(
       "insert into clicks (link_id, at, referrer_host, user_agent, is_bot, country, device, os, blocked, ip, city, region, asn, as_org) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, blockBot ? 2 : allowed ? 0 : 1,
+    ).bind(link.id, ts, ref, ua, bot ? 1 : 0, country, device, os, blockBot ? 2 : blockVpn ? 3 : allowed ? 0 : 1,
       rob.ip ?? null, rob.city ?? null, rob.region ?? null, rob.asn ?? null, rob.org ?? null)];
     if (!bot && allowed) {
       writes.push(db.prepare("update links set clicks = clicks + 1, last_click_at = ? where id = ?").bind(ts, link.id));
@@ -314,13 +317,14 @@ async function readLinkForm(c) {
     if (!(e instanceof core.ValidationError)) throw e;
     errors[e.field] = e.message;
   }
+  values.block_vpn = f.get("block_vpn") ? "1" : "";
   values.track = f.get("track") ? "1" : "";
   values.network = NETWORKS[String(f.get("network"))] ? String(f.get("network")) : "other";
   values.sub_param = String(f.get("sub_param") || "");
   values.track_source = LINK_SOURCES.includes(String(f.get("track_source"))) ? String(f.get("track_source")) : "ads";
   const track = { on: values.track ? 1 : 0, network: values.network, sub_param: cleanParam(values.sub_param), source: values.track_source };
   if (track.on && !track.sub_param) errors.sub_param = "Use só letras, números, ponto, hífen ou sublinhado (ex.: tid).";
-  return { values, errors, dest, slug, domain, title, geo, track };
+  return { values, errors, dest, slug, domain, title, geo, track, vpn: values.block_vpn ? 1 : 0 };
 }
 
 async function listLinks(c, q = "", domainFilter = "") {
@@ -412,7 +416,7 @@ async function linksPage(c) {
 }
 
 async function createLink(c) {
-  const { values, errors, dest, slug, domain, title, geo, track } = await readLinkForm(c);
+  const { values, errors, dest, slug, domain, title, geo, track, vpn } = await readLinkForm(c);
   if (!Object.keys(errors).length) {
     const ts = now();
     const id = newId();
@@ -421,8 +425,8 @@ async function createLink(c) {
       const s = slug || core.randomSlug();
       try {
         await c.db.prepare(
-          "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, geo_mode, geo_countries, track, network, sub_param, track_source, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        ).bind(id, c.user.id, domain.id, s, s.toLowerCase(), dest, title, geo.mode, geo.countries, track.on, track.on ? track.network : null, track.on ? track.sub_param : null, track.source, ts, ts).run();
+          "insert into links (id, user_id, domain_id, slashtag, slashtag_lower, destination, title, geo_mode, geo_countries, block_vpn, track, network, sub_param, track_source, created_at, updated_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        ).bind(id, c.user.id, domain.id, s, s.toLowerCase(), dest, title, geo.mode, geo.countries, vpn, track.on, track.on ? track.network : null, track.on ? track.sub_param : null, track.source, ts, ts).run();
         c.flash("success", "Link criado.");
         return c.redirect(`/links?new=${id}`);
       } catch (e) {
@@ -444,7 +448,7 @@ async function editLink(c, id) {
   if (!link) return notFound(c);
   let values = {
     destination: link.destination, slashtag: link.slashtag, title: link.title || "", domain_id: link.domain_id,
-    geo_mode: link.geo_mode || "off", geo_countries: link.geo_countries || "",
+    geo_mode: link.geo_mode || "off", geo_countries: link.geo_countries || "", block_vpn: link.block_vpn ? "1" : "",
     track: link.track ? "1" : "", network: link.network || "clickbank", sub_param: link.sub_param || "", track_source: link.track_source || "ads",
   };
   let errors = {};
@@ -456,8 +460,8 @@ async function editLink(c, id) {
     if (!Object.keys(errors).length) {
       try {
         await c.db.prepare(
-          "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, geo_mode = ?, geo_countries = ?, track = ?, network = ?, sub_param = ?, track_source = ?, updated_at = ? where id = ? and user_id = ?",
-        ).bind(r.dest, r.slug, r.slug.toLowerCase(), r.title, r.domain.id, r.geo.mode, r.geo.countries, r.track.on,
+          "update links set destination = ?, slashtag = ?, slashtag_lower = ?, title = ?, domain_id = ?, geo_mode = ?, geo_countries = ?, block_vpn = ?, track = ?, network = ?, sub_param = ?, track_source = ?, updated_at = ? where id = ? and user_id = ?",
+        ).bind(r.dest, r.slug, r.slug.toLowerCase(), r.title, r.domain.id, r.geo.mode, r.geo.countries, r.vpn, r.track.on,
           r.track.on ? r.track.network : null, r.track.on ? r.track.sub_param : null, r.track.source, now(), id, c.user.id).run();
         c.flash("success", "Alterações salvas.");
         return c.redirect("/links");
@@ -499,8 +503,9 @@ async function linkStats(c, id) {
   ).bind(id).all()).results;
   const bots = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 1 and blocked <> 2").bind(id).first()).n;
   const robotsBlocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and blocked = 2").bind(id).first()).n;
+  const vpnBlocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and blocked = 3").bind(id).first()).n;
   const robots = (await c.db.prepare(
-    "select at, ip, city, region, country, asn, as_org, user_agent, blocked from clicks where link_id = ? and is_bot = 1 order by id desc limit 50",
+    "select at, ip, city, region, country, asn, as_org, user_agent, blocked from clicks where link_id = ? and (is_bot = 1 or blocked = 3) order by id desc limit 50",
   ).bind(id).all()).results;
   const blocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 1").bind(id).first()).n;
   const breakdown = async (col) => (await c.db.prepare(
@@ -511,7 +516,7 @@ async function linkStats(c, id) {
   const systems = (await breakdown("os")).map((r) => ({ label: r.k || "Desconhecido", n: r.n }));
   const last30 = days.reduce((a, [, n]) => a + n, 0);
   return c.respond(V.statsView(c.view(), {
-    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, robotsBlocked, robots, last30, countries, devices, systems,
+    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, robotsBlocked, vpnBlocked, robots, last30, countries, devices, systems,
   }));
 }
 

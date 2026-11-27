@@ -79,6 +79,7 @@ export const MIGRATIONS = [
   `alter table clicks add column as_org text`,
   `alter table links add column geo_mode text not null default 'off'`,
   `alter table links add column geo_countries text not null default ''`,
+  `alter table links add column block_vpn integer not null default 0`,
   `alter table links add column track integer not null default 0`,
   `alter table links add column network text`,
   `alter table links add column sub_param text`,

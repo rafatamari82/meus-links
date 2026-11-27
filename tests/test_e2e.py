@@ -182,7 +182,7 @@ class E2E(unittest.TestCase):
         p.get_by_role("link", name=re.compile(r"^Estatísticas de robocheck:")).click()
         expect(p.get_by_text("3 acessos de robôs foram barrados pelo filtro anti-robô.")).to_be_visible()
         rob = p.locator("section.robots")
-        expect(rob.get_by_role("heading", name="Acessos de robôs")).to_be_visible()
+        expect(rob.get_by_role("heading", name="Acessos de robôs e VPN")).to_be_visible()
         row = rob.locator("tbody tr", has_text="python-requests")
         expect(row.locator("td[data-label=IP]")).to_have_text(re.compile(r"127\.0\.0\.1|::1"))  # the dev server's connection IP
         expect(row).to_contain_text("Estados Unidos")
@@ -202,6 +202,32 @@ class E2E(unittest.TestCase):
         p.get_by_label(re.compile("^Barrar robôs")).check()
         expect(p.get_by_text("Filtro anti-robô ligado.")).to_be_visible()
         self.assertEqual(get("curl/8.4.0"), 403)
+
+    def test_f04_block_vpn(self):
+        p = self.page
+        self.create("https://exemplo.com/vpn", "vpncheck")
+        chrome = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile Safari/604.1"
+        hit = lambda asn: p.request.get(self.base + "/vpncheck", max_redirects=0, headers={"User-Agent": chrome, "X-Test-ASN": str(asn), "X-Test-Org": "Datacamp Limited"})
+        self.assertEqual(hit(60068).status, 302)  # switch off: a VPN network passes
+        # turn on "Barrar VPN" in the link's Países section
+        p.goto(self.base + "/links")
+        p.get_by_role("link", name="Editar vpncheck").click()
+        p.wait_for_url(re.compile(r"/links/[^/]+/edit$"))
+        p.locator("details.geo").evaluate("d => { d.open = true; }")
+        expect(p.locator("label.vpn-check")).to_contain_text("Barrar VPN e proxies")
+        p.locator("input[name=block_vpn]").check()
+        p.get_by_role("button", name="Salvar", exact=True).click()
+        expect(p.get_by_text("Alterações salvas.")).to_be_visible()
+        expect(p.locator("tr", has_text="vpncheck")).to_contain_text("Sem VPN")
+        r = hit(60068)
+        self.assertNotEqual(r.status, 302)
+        self.assertIn("Aqui não", r.text())
+        self.assertEqual(hit(28573).status, 302)   # home internet (Claro) passes
+        self.assertEqual(hit(15169).status, 302)   # Google's network is never blocked
+        self.assertEqual(self.clicks_for("vpncheck"), 3)
+        p.get_by_role("link", name=re.compile(r"^Estatísticas de vpncheck:")).click()
+        expect(p.get_by_text("1 acesso por VPN foi barrado.")).to_be_visible()
+        expect(p.locator("section.robots tbody tr", has_text="VPN barrada")).to_contain_text("Datacamp Limited")
 
     def test_f02_bots_and_previews_do_not_count(self):
         self.create("https://exemplo.com/bot", "botcheck")

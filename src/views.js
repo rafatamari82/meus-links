@@ -156,8 +156,8 @@ function geoFields(v, e) {
   const chosen = new Set(String(v.geo_countries || "").split(",").filter(Boolean));
   const radio = (val, label) => html`<label class="check"><input type="radio" name="geo_mode" value="${val}" ${mode === val ? raw("checked") : ""} data-geo-mode> ${label}</label>`;
   return html`
-<details class="utm geo" ${mode !== "off" || e.geo ? raw("open") : ""}>
-  <summary>Países ${mode === "off" ? "" : html`<span class="badge badge-warning">${mode === "block" ? "bloqueando" : "só liberados"}: ${chosen.size}</span>`}</summary>
+<details class="utm geo" ${mode !== "off" || e.geo || v.block_vpn ? raw("open") : ""}>
+  <summary>Países ${mode === "off" ? "" : html`<span class="badge badge-warning">${mode === "block" ? "bloqueando" : "só liberados"}: ${chosen.size}</span>`}${v.block_vpn ? html` <span class="badge badge-warning">sem VPN</span>` : ""}</summary>
   <fieldset class="geo-modes" ${e.geo ? raw('aria-describedby="geo-err"') : ""}>
     <legend class="sr-only">Onde o link funciona</legend>
     ${radio("off", "Funciona em todos os países")}
@@ -173,6 +173,8 @@ function geoFields(v, e) {
       ${OPTIONS.map(([code, name]) => html`<label class="check geo-item" data-name="${name.toLowerCase()} ${code.toLowerCase()}"><input type="checkbox" name="geo_countries" value="${code}" ${chosen.has(code) ? raw("checked") : ""}> ${name}</label>`)}
     </div>
   </div>
+  <label class="check vpn-check"><input type="checkbox" name="block_vpn" value="1" ${v.block_vpn ? raw("checked") : ""}>
+    <span>Barrar VPN e proxies<span class="hint">Quem usa VPN para fingir estar em outro país vê a mesma página de bloqueio. Pega a maioria das VPNs comerciais, não todas.</span></span></label>
 </details>`;
 }
 
@@ -284,7 +286,7 @@ export function linksView(c, { rows, total, q, domainFilter, domains, activeDoma
       <td data-label="Link">
         ${l.title ? html`<div class="link-title">${l.title}</div>` : ""}
         ${l.track ? html`<div class="hint"><span class="badge badge-accent">Rastreado · ${NETWORKS[l.network]?.name || l.network}${l.track_source && l.track_source !== "ads" ? ` · ${SOURCES[l.track_source]}` : ""}</span></div>` : ""}
-        ${l.geo_mode && l.geo_mode !== "off" ? html`<div class="hint">${l.geo_mode === "block" ? "Bloqueado em" : "Só funciona em"} ${geoSummary(l.geo_countries)}</div>` : ""}
+        ${l.geo_mode && l.geo_mode !== "off" ? html`<div class="hint">${l.geo_mode === "block" ? "Bloqueado em" : "Só funciona em"} ${geoSummary(l.geo_countries)}${l.block_vpn ? " · sem VPN" : ""}</div>` : l.block_vpn ? html`<div class="hint">Sem VPN</div>` : ""}
         <div class="short-row">
           <a class="short-url" href="${shortUrl(l)}" target="_blank" rel="noopener">${l.domain_name}/${l.slashtag}</a>
           <button class="btn btn-ghost btn-xs" type="button" data-copy="${shortUrl(l)}" aria-label="Copiar ${l.domain_name}/${l.slashtag}">Copiar</button>
@@ -371,7 +373,7 @@ function breakdownCard(title, rows, total) {
 </section>`;
 }
 
-export function statsView(c, { link, days, peak, refs, bots, blocked = 0, robotsBlocked = 0, robots = [], last30, countries = [], devices = [], systems = [] }) {
+export function statsView(c, { link, days, peak, refs, bots, blocked = 0, robotsBlocked = 0, vpnBlocked = 0, robots = [], last30, countries = [], devices = [], systems = [] }) {
   const su = `${c.scheme}://${link.domain_name}/${link.slashtag}`;
   const bars = days.map(([label, n], i) => {
     const h = n ? (n / peak) * 110 : 0;
@@ -410,19 +412,20 @@ export function statsView(c, { link, days, peak, refs, bots, blocked = 0, robots
   ${refs.length ? html`<table class="simple"><thead><tr><th scope="col">Origem</th><th scope="col" class="num">Cliques</th></tr></thead>
   <tbody>${refs.map((r) => html`<tr><td>${r.ref}</td><td class="num">${r.n}</td></tr>`)}</tbody></table>` : html`<p class="muted">Nada ainda.</p>`}
   ${blocked ? html`<p class="hint">${blocked} ${blocked === 1 ? "acesso de país bloqueado foi barrado e não entrou" : "acessos de países bloqueados foram barrados e não entraram"} na contagem.</p>` : ""}
+  ${vpnBlocked ? html`<p class="hint">${vpnBlocked} ${vpnBlocked === 1 ? "acesso por VPN foi barrado" : "acessos por VPN foram barrados"}.</p>` : ""}
   ${robotsBlocked ? html`<p class="hint">${robotsBlocked} ${robotsBlocked === 1 ? "acesso de robô foi barrado" : "acessos de robôs foram barrados"} pelo filtro anti-robô.</p>` : ""}
   ${bots ? html`<p class="hint">${bots} ${bots === 1 ? "acesso de robôs e prévias de redes sociais não entrou" : "acessos de robôs e prévias de redes sociais não entraram"} na contagem.</p>` : ""}
 </section>
 ${robots.length ? html`<section class="card table-wrap robots">
-  <h2 class="h-md pad-x">Acessos de robôs</h2>
-  <p class="hint pad-x">Os últimos ${robots.length}. O IP e o local são guardados só dos robôs, nunca das pessoas.</p>
+  <h2 class="h-md pad-x">Acessos de robôs e VPN</h2>
+  <p class="hint pad-x">Os últimos ${robots.length}. O IP e o local são guardados só de robôs e VPNs barradas, nunca das pessoas.</p>
   <table class="simple robot-table"><thead><tr><th scope="col">Quando</th><th scope="col">IP</th><th scope="col">Local</th><th scope="col">Rede</th><th scope="col">Situação</th><th scope="col">Navegador</th></tr></thead>
   <tbody>${robots.map((r) => html`<tr>
     <td data-label="Quando">${fmtDateTime(r.at)}</td>
     <td data-label="IP" class="mono">${r.ip || "—"}</td>
     <td data-label="Local">${[r.city, r.region, r.country && countryName(r.country)].filter(Boolean).join(", ") || "—"}</td>
     <td data-label="Rede">${r.as_org || "—"}${r.asn ? html` <span class="hint">AS${r.asn}</span>` : ""}</td>
-    <td data-label="Situação">${r.blocked === 2 ? html`<span class="badge badge-warning">Barrado</span>` : html`<span class="badge">Liberado</span>`}</td>
+    <td data-label="Situação">${r.blocked === 2 ? html`<span class="badge badge-warning">Barrado</span>` : r.blocked === 3 ? html`<span class="badge badge-warning">VPN barrada</span>` : html`<span class="badge">Liberado</span>`}</td>
     <td data-label="Navegador" class="ua-cell" title="${r.user_agent || ""}">${(r.user_agent || "(vazio)").slice(0, 60)}${(r.user_agent || "").length > 60 ? "…" : ""}</td>
   </tr>`)}</tbody></table>
   <p class="hint pad-x">Liberado: robôs do Google, NewsBreak e prévias de redes sociais (ou o filtro estava desligado). Não contam como clique.</p>
