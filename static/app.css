@@ -576,3 +576,4 @@ a.set-row:hover { background: var(--color-surface); }
 .medal { width: auto; height: 76px; flex: none; }
 @media (max-width: 760px) { .medal { width: auto; height: 60px; } }
 .medal { height: 68px; } @media (max-width: 760px) { .medal { height: 54px; } }
+.medal { height: 60px; } @media (max-width: 760px) { .medal { height: 50px; } }
