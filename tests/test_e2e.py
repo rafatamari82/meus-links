@@ -823,6 +823,25 @@ class E2E(unittest.TestCase):
         expect(m.locator(".net-cards.mobile-only .net-card").get_by_role("img", name="Digistore24")).to_have_count(0)
         m.context.close()
 
+    def test_t15_performance_chart(self):
+        p = self.page
+        p.goto(self.base + "/results?p=month")
+        perf = p.locator("section.perf")
+        expect(perf.get_by_role("heading", name="Desempenho")).to_be_visible()
+        expect(perf).to_contain_text("Este mês x Mês passado")
+        expect(perf.locator(".perf-foot")).to_contain_text("Faturamento:")
+        expect(perf.locator(".perf-foot")).to_contain_text("Vendas:")
+        perf.screenshot(path="/tmp/perf-month.png")
+        perf.get_by_label("Métricas").select_option(label="Faturamento e gasto")
+        p.wait_for_url(re.compile(r"chart=rc"))
+        expect(p.locator("section.perf .perf-foot")).to_contain_text("Gasto:")
+        expect(p.locator("#p")).to_have_value("month")  # the period stays
+        p.goto(self.base + "/results?p=today")
+        expect(p.locator("section.perf")).to_contain_text("Hoje x Ontem")
+        p.locator("section.perf").screenshot(path="/tmp/perf-today.png")
+        p.goto(self.base + "/results?p=7d")
+        expect(p.locator("section.perf")).to_contain_text("7 dias anteriores")
+
     def test_t11_google_script_uploads_sales(self):
         p = self.page
         p.goto(self.base + "/links")

@@ -502,3 +502,34 @@ a.set-row:hover { background: var(--color-surface); }
 .net-logo.nl-smartadv { width: 88px; height: 17px; } .plat-tile .net-logo.nl-smartadv, .plat-setup .net-logo.nl-smartadv { width: 105px; height: 20px; }
 .net-logo.nl-smashloud { width: 61px; height: 18px; } .plat-tile .net-logo.nl-smashloud, .plat-setup .net-logo.nl-smashloud { width: 73px; height: 21px; }
 .net-logo { object-fit: contain; max-width: none; }
+
+/* Desempenho (performance chart) */
+.perf { padding: 0; overflow: hidden; }
+.perf-head { background: var(--color-surface); padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--color-border); }
+.perf-head .h-md { margin: 0; }
+.perf-ctrl { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--color-border); margin: 0 var(--space-5); padding-left: 0; padding-right: 0; }
+.perf-ctrl label { font-weight: 600; }
+.perf-ctrl select { width: auto; height: 34px; }
+.perf-time { margin-left: var(--space-4); color: var(--color-text-muted); }
+.perf-time strong { color: var(--color-text); margin-right: var(--space-2); }
+.perf-svg { display: block; width: 100%; height: auto; padding: var(--space-3) var(--space-3) 0; }
+.perf-grid { stroke: var(--color-border); stroke-width: 1; }
+.perf-axl, .perf-axr, .perf-axx, .perf-axt { font-family: var(--font-sans); font-size: 14px; fill: var(--color-text-muted); }
+.perf-axl { fill: #0565e6; }
+.perf-axr, .perf-axt-2 { fill: #ea6a1f; }
+.perf-axt { font-size: 13px; }
+.perf-line-1 { fill: none; stroke: #0565e6; stroke-width: 2.5; stroke-linejoin: round; }
+.perf-line-2 { fill: none; stroke: #ea6a1f; stroke-width: 2.5; stroke-linejoin: round; }
+.perf-area-1 { fill: rgba(5, 101, 230, .14); }
+.perf-area-2 { fill: rgba(234, 106, 31, .2); }
+.perf-dot { fill: transparent; cursor: default; }
+.perf-dot:hover { fill: rgba(5, 101, 230, .15); }
+.perf-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); padding: var(--space-2) var(--space-5) var(--space-3); color: var(--color-text); font-size: var(--text-sm); }
+.lg { display: inline-block; width: 26px; vertical-align: middle; margin-right: var(--space-2); }
+.lg-line-1 { height: 2.5px; background: #0565e6; }
+.lg-line-2 { height: 2.5px; background: #ea6a1f; }
+.lg-area-1 { height: 10px; background: rgba(5, 101, 230, .2); }
+.lg-area-2 { height: 10px; background: rgba(234, 106, 31, .28); }
+.perf-foot { display: flex; justify-content: center; gap: var(--space-6); padding: var(--space-3) var(--space-5); border-top: 1px solid var(--color-border); margin: 0 var(--space-5); font-size: var(--text-sm); }
+.perf-end-1 { fill: #0565e6; stroke: #fff; stroke-width: 2; }
+.perf-end-2 { fill: #ea6a1f; stroke: #fff; stroke-width: 2; }

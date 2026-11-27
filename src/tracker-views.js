@@ -36,23 +36,78 @@ function stat(label, value, tone = "") {
   return html`<div class="card pad stat"><p class="stat-label">${label}</p><p class="stat-value ${tone}">${value}</p></div>`;
 }
 
-function chart(series, cur) {
-  if (!series.some((x) => x.rev || x.cost)) return html`<p class="muted">Sem vendas nem gasto no período.</p>`;
-  const max = Math.max(1, ...series.map((x) => Math.max(Math.abs(x.rev), x.cost)));
-  const w = 300 / series.length;
-  const bw = Math.max(1, w / 2 - 1);
-  const bars = series.map((x, i) => {
-    const hr = (Math.max(0, x.rev) / max) * 110;
-    const hc = (x.cost / max) * 110;
-    return html`<rect x="${(i * w + 0.5).toFixed(2)}" y="${(115 - hr).toFixed(1)}" width="${bw.toFixed(2)}" height="${Math.max(hr, 0.5).toFixed(1)}" class="bar"><title>${ddmm(x.d)} faturamento ${fmtMoney(x.rev, cur)}</title></rect>
-<rect x="${(i * w + 0.5 + bw + 0.5).toFixed(2)}" y="${(115 - hc).toFixed(1)}" width="${bw.toFixed(2)}" height="${Math.max(hc, 0.5).toFixed(1)}" class="bar-cost"><title>${ddmm(x.d)} gasto ${fmtMoney(x.cost, cur)}</title></rect>`;
-  });
-  return html`
-<div class="legend"><span><i class="sw sw-rev"></i>Faturamento</span><span><i class="sw sw-cost"></i>Gasto</span></div>
-<svg class="bars" viewBox="0 0 300 120" preserveAspectRatio="none" role="img" aria-label="Faturamento e gasto por dia">${bars}</svg>
-<div class="bars-axis"><span>${ddmm(series[0].d)}</span><span>${ddmm(series[series.length - 1].d)}</span></div>
-<table class="sr-only"><caption>Faturamento e gasto por dia</caption><thead><tr><th>Dia</th><th>Faturamento</th><th>Gasto</th></tr></thead>
-<tbody>${series.map((x) => html`<tr><th scope="row">${ddmm(x.d)}</th><td>${fmtMoney(x.rev, cur)}</td><td>${fmtMoney(x.cost, cur)}</td></tr>`)}</tbody></table>`;
+// "Desempenho": running totals of this period (lines) against the period before (soft areas), two axes.
+function perfChart(sr, cur, keep) {
+  const W = 1000, H = 300, L = 72, R = 72, T = 16, B = 40;
+  const pw = W - L - R, ph = H - T - B;
+  const second = sr.metric === "rc"
+    ? { key: "cost", name: "Gasto", money: true }
+    : { key: "sales", name: "Vendas", money: false };
+  const run = (arr, key) => { let s = 0; return arr.map((x) => (s += x[key] || 0)); };
+  const cRev = run(sr.cur, "rev"), c2 = run(sr.cur, second.key);
+  const pRev = sr.prev ? run(sr.prev, "rev") : [], p2 = sr.prev ? run(sr.prev, second.key) : [];
+  const n = Math.max(sr.cur.length, sr.prev ? sr.prev.length : 0, 2);
+  const nice = (v) => {
+    if (v <= 0) return 1;
+    const e = 10 ** Math.floor(Math.log10(v)), f = v / e;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e;
+  };
+  const maxL = nice(Math.max(1, ...cRev, ...pRev));
+  // Sales are whole numbers: the right axis steps by 1, 2, 5, 10... so every tick is an integer.
+  const intStep = (v) => { const s = Math.max(1, Math.ceil(v / 4)); const e = 10 ** Math.floor(Math.log10(s)); const f = s / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e; };
+  const maxR = second.money ? nice(Math.max(1, ...c2, ...p2)) : 4 * intStep(Math.max(4, ...c2, ...p2));
+  const x = (i) => L + (pw * i) / (n - 1);
+  const yL = (v) => T + ph - (ph * Math.max(0, v)) / maxL;
+  const yR = (v) => T + ph - (ph * Math.max(0, v)) / maxR;
+  const line = (vals, y) => vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+  const area = (vals, y) => (vals.length ? `${line(vals, y)} L${x(vals.length - 1).toFixed(1)} ${T + ph} L${x(0).toFixed(1)} ${T + ph} Z` : "");
+  const short = (v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1).replace(".", ",")} mi` : v >= 1e3 ? `${(v / 1e3).toFixed(v >= 1e4 ? 0 : 1).replace(".", ",")} mil` : String(Math.round(v)));
+  const money = (cents) => short(cents / 100);
+  const ticks = [0, 1, 2, 3, 4];
+  const label = (k) => (sr.hourly ? `${k.slice(11)}h` : sr.byDayOfMonth ? k.slice(8, 10) : `${k.slice(8, 10)}/${k.slice(5, 7)}`);
+  const keys = sr.cur.length >= (sr.prev?.length || 0) ? sr.cur.map((p) => p.k) : sr.prev.map((p) => p.k);
+  const step = Math.max(1, Math.ceil(n / 12));
+  const totCur = { rev: cRev.at(-1) || 0, two: c2.at(-1) || 0 };
+  const totPrev = { rev: pRev.at(-1) || 0, two: p2.at(-1) || 0 };
+  const fmt2 = (v) => (second.money ? fmtMoney(v, cur) : String(v));
+  const empty = !totCur.rev && !totCur.two && !totPrev.rev && !totPrev.two;
+  return html`<section class="card desktop-only perf">
+  <div class="perf-head"><h2 class="h-md">Desempenho</h2></div>
+  <form class="perf-ctrl" method="get" action="/results">
+    ${Object.entries(keep).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
+    <label for="perf-m">Métricas</label>
+    <select id="perf-m" name="chart" data-autosubmit-select>
+      <option value="rv" ${sr.metric === "rv" ? raw("selected") : ""}>Faturamento e vendas</option>
+      <option value="rc" ${sr.metric === "rc" ? raw("selected") : ""}>Faturamento e gasto</option>
+    </select>
+    <span class="perf-time"><strong>Tempo</strong> ${sr.curLabel}${sr.prev ? ` x ${sr.prevLabel}` : ""}</span>
+    <noscript><button class="btn btn-secondary btn-sm" type="submit">Ver</button></noscript>
+  </form>
+  ${empty ? html`<p class="muted pad">Sem vendas nem gasto neste período.</p>` : html`
+  <svg class="perf-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Faturamento e ${second.name.toLowerCase()} acumulados, ${sr.curLabel}${sr.prev ? ` comparado com ${sr.prevLabel}` : ""}">
+    ${ticks.map((i) => { const yy = T + ph - (ph * i) / 4; return html`<line class="perf-grid" x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}"/>
+    <text class="perf-axl" x="${L - 10}" y="${yy + 4}" text-anchor="end">${money((maxL * i) / 4)}</text>
+    <text class="perf-axr" x="${W - R + 10}" y="${yy + 4}">${second.money ? money((maxR * i) / 4) : short((maxR * i) / 4)}</text>`; })}
+    ${keys.map((k, i) => (i % step === 0 || i === keys.length - 1) && (i === keys.length - 1 ? true : keys.length - 1 - i >= step / 2) ? html`<text class="perf-axx" x="${x(i)}" y="${H - 14}" text-anchor="middle">${label(k)}</text>` : "")}
+    ${sr.prev ? html`<path class="perf-area-2" d="${area(p2, yR)}"/><path class="perf-area-1" d="${area(pRev, yL)}"/>` : ""}
+    <path class="perf-line-2" d="${line(c2, yR)}"/>
+    <path class="perf-line-1" d="${line(cRev, yL)}"/>
+    ${cRev.length ? html`<circle class="perf-end-2" cx="${x(c2.length - 1).toFixed(1)}" cy="${yR(c2.at(-1)).toFixed(1)}" r="4"/><circle class="perf-end-1" cx="${x(cRev.length - 1).toFixed(1)}" cy="${yL(cRev.at(-1)).toFixed(1)}" r="4"/>` : ""}
+    ${sr.cur.map((p, i) => html`<circle class="perf-dot" cx="${x(i).toFixed(1)}" cy="${yL(cRev[i]).toFixed(1)}" r="9"><title>${label(p.k)}: faturamento ${fmtMoney(cRev[i], cur)} · ${second.name.toLowerCase()} ${fmt2(c2[i])}${sr.prev && sr.prev[i] ? ` (antes: ${fmtMoney(pRev[i], cur)} · ${fmt2(p2[i])})` : ""}</title></circle>`)}
+    <text class="perf-axt" transform="translate(16 ${T + ph / 2}) rotate(-90)" text-anchor="middle">Faturamento</text>
+    <text class="perf-axt perf-axt-2" transform="translate(${W - 14} ${T + ph / 2}) rotate(90)" text-anchor="middle">${second.name}</text>
+  </svg>
+  <div class="perf-legend">
+    <span><i class="lg lg-line-1"></i>Faturamento ${sr.curLabel.toLowerCase()}</span>
+    ${sr.prev ? html`<span><i class="lg lg-area-1"></i>Faturamento ${sr.prevLabel.toLowerCase()}</span>` : ""}
+    <span><i class="lg lg-line-2"></i>${second.name} ${sr.curLabel.toLowerCase()}</span>
+    ${sr.prev ? html`<span><i class="lg lg-area-2"></i>${second.name} ${sr.prevLabel.toLowerCase()}</span>` : ""}
+  </div>
+  <div class="perf-foot">
+    <span>Faturamento: <strong>${fmtMoney(totCur.rev, cur)}</strong>${sr.prev ? html` <span class="muted">vs</span> <strong>${fmtMoney(totPrev.rev, cur)}</strong>` : ""}</span>
+    <span>${second.name}: <strong>${fmt2(totCur.two)}</strong>${sr.prev ? html` <span class="muted">vs</span> <strong>${fmt2(totPrev.two)}</strong>` : ""}</span>
+  </div>`}
+</section>`;
 }
 
 export function resultsView(c, { s, range, byAd, srcFilter, netFilter = "", prodFilter = "", list, tot, series, hasAny, sources = [], networks = [], products = [], productNames = [], money = {}, audience = { age: [], gender: [] } }) {
@@ -163,10 +218,7 @@ ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) =
   </div>
 </div>
 
-<section class="card pad desktop-only">
-  <h2 class="h-md">Faturamento e gasto por dia</h2>
-  ${chart(series, cur)}
-</section>
+${perfChart(series, cur, { ...base, ...withSrc, ...withBy })}
 ${audienceSection(audience, m, cur)}
 <section class="card table-wrap desktop-only">
   <div class="table-head">

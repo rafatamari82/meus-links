@@ -525,6 +525,34 @@ function spToday() {
 const addDays = (d, n) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 const utcStart = (d) => `${d}T0${SP_OFFSET_H}:00:00Z`;
 
+/**
+ * What the performance chart compares: a single day hour by hour against the day before; "this month" against
+ * last month; other periods (up to their last 92 days) against the same number of days just before; "all" alone.
+ */
+function compareWindow(range) {
+  const today = spToday();
+  const nowHour = new Date(Date.now() - SP_OFFSET_H * 36e5).toISOString().slice(11, 13);
+  const hours = (d) => Array.from({ length: 24 }, (_, h) => `${d} ${String(h).padStart(2, "0")}`);
+  const span = (a, b) => { const out = []; for (let d = a; d <= b; d = addDays(d, 1)) out.push(d); return out; };
+  if (range.from === range.to) {
+    const prevDay = addDays(range.from, -1);
+    const cur = hours(range.from).filter((k) => range.from < today || k.slice(11) <= nowHour);
+    return { hourly: true, curKeys: cur, prevKeys: hours(prevDay), qFrom: prevDay, curLabel: range.from === today ? "Hoje" : ddmmY(range.from), prevLabel: range.from === today ? "Ontem" : ddmmY(prevDay) };
+  }
+  const to = range.to > today ? today : range.to;
+  if (range.preset === "month") {
+    const prevTo = addDays(range.from, -1);
+    const prevFrom = `${prevTo.slice(0, 8)}01`;
+    return { hourly: false, byDayOfMonth: true, curKeys: span(range.from, to), prevKeys: span(prevFrom, prevTo), qFrom: prevFrom, curLabel: "Este mês", prevLabel: "Mês passado" };
+  }
+  const from = range.from > addDays(range.to, -91) ? range.from : addDays(range.to, -91);
+  const len = span(from, range.to).length;
+  if (range.preset === "all") return { hourly: false, curKeys: span(from, to), prevKeys: null, qFrom: from, curLabel: "Últimos 92 dias", prevLabel: "" };
+  const prevFrom = addDays(from, -len);
+  return { hourly: false, curKeys: span(from, to), prevKeys: span(prevFrom, addDays(from, -1)), qFrom: prevFrom, curLabel: "Período", prevLabel: `${len} dias anteriores` };
+}
+const ddmmY = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+
 export function readRange(params) {
   const today = spToday();
   const preset = params.get("p") || "7d";
@@ -563,6 +591,7 @@ export async function resultsPage(c) {
   const adCol = byAd ? ", coalesce(ad, '') as ad" : ", '' as ad";
   const adGroup = byAd ? ", ad" : "";
   const srcSql = srcFilter ? " and coalesce(k.source, 'none') = ?" : "";
+  const cmp = compareWindow(range);
   // Every query goes to the database in one round trip (it is far away, so each trip costs).
   const [clicks, convs, costs, nameRows, dRows, cRows, hasAnyRows, netRows, linkNets, pRows, prodNameRows, srcRows, demoRows] = (await db.batch([
     db.prepare(
@@ -580,12 +609,12 @@ export async function resultsPage(c) {
   ).bind(range.from, range.to),
     db.prepare("select source || '|' || campaign_key as k, max(campaign_name) as name from tk_costs group by source, campaign_key"),
     db.prepare(
-    `select substr(datetime(v.at, '-${SP_OFFSET_H} hours'), 1, 10) as d, v.type, v.currency, sum(v.amount_cents) as cents
+    `select substr(datetime(v.at, '-${SP_OFFSET_H} hours'), 1, ${cmp.hourly ? 13 : 10}) as d, v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
      from tk_conversions v left join tk_clicks k on k.id = v.click_id where v.at >= ? and v.at < ?${srcSql}${vSql} group by 1, 2, 3`,
-    ).bind(range.start, range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs),
+    ).bind(utcStart(cmp.qFrom), range.end, ...(srcFilter ? [srcFilter] : []), ...vArgs),
     db.prepare(
     `select date as d, currency, sum(cost_cents) as cents from tk_costs where date >= ? and date <= ?${srcFilter ? " and source = ?" : ""} group by 1, 2`,
-    ).bind(range.from, range.to, ...(srcFilter ? [srcFilter] : [])),
+    ).bind(cmp.qFrom, range.to, ...(srcFilter ? [srcFilter] : [])),
     db.prepare("select (select count(*) from tk_clicks) + (select count(*) from tk_conversions) + (select count(*) from tk_costs) as n"),
     db.prepare(
     `select v.network, v.type, v.currency, sum(v.amount_cents) as cents, count(*) as n
@@ -657,16 +686,18 @@ export async function resultsPage(c) {
   tot.roas = tot.cost ? tot.revenue / tot.cost : null;
   tot.cpa = tot.cost && tot.sales ? Math.round(tot.cost / tot.sales) : null;
 
-  // per day, for the chart
-  const days = [];
-  // The chart shows at most the last 92 days of the period (all of it for short periods).
-  const chartFrom = range.from > addDays(range.to, -91) ? range.from : addDays(range.to, -91);
-  for (let d = chartFrom; d <= range.to; d = addDays(d, 1)) days.push(d);
-  const dayRev = Object.fromEntries(days.map((d) => [d, 0]));
-  const dayCost = Object.fromEntries(days.map((d) => [d, 0]));
-  for (const r of dRows) if (r.d in dayRev) dayRev[r.d] += sumRev(r.type, conv(r.cents, r.currency));
-  for (const r of cRows) if (r.d in dayCost) dayCost[r.d] += conv(r.cents, r.currency);
-  const series = days.map((d) => ({ d, rev: dayRev[d], cost: dayCost[d] }));
+  // Performance chart: this period against the one before, point by point (hours for a single day, days otherwise).
+  const bucket = {};
+  const add = (k) => (bucket[k] ||= { rev: 0, sales: 0, cost: 0 });
+  for (const r of dRows) {
+    const x = add(r.d);
+    x.rev += sumRev(r.type, conv(r.cents, r.currency));
+    if (r.type === "sale" || r.type === "upsell") x.sales += r.n;
+  }
+  for (const r of cRows) add(cmp.hourly ? `${r.d} 00` : r.d).cost += conv(r.cents, r.currency);
+  const pick = (keys) => keys.map((k) => ({ k, ...(bucket[k] || { rev: 0, sales: 0, cost: 0 }) }));
+  const metric = c.url.searchParams.get("chart") === "rc" ? "rc" : "rv";
+  const series = { ...cmp, metric, cur: pick(cmp.curKeys), prev: cmp.prevKeys ? pick(cmp.prevKeys) : null };
 
   const hasAny = hasAnyRows[0]?.n || 0;
   // Per network, for the cards: networks of tracked links plus any that sent a sale in the period.
