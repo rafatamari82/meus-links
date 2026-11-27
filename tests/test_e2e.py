@@ -487,7 +487,7 @@ class E2E(unittest.TestCase):
         expect(p.locator("#csv-err")).to_be_visible()
         p.goto(self.base + "/integrations")
         p.get_by_label("1 dólar = R$").fill("0")
-        p.get_by_role("button", name="Salvar").last.click()
+        p.locator('form[action="/integrations/settings"]').get_by_role("button", name="Salvar").click()
         expect(p.get_by_role("alert")).to_contain_text("câmbio maior que zero")
 
     def test_t04_phone_notifications(self):

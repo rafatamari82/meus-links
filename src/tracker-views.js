@@ -379,6 +379,13 @@ ${notifySection(c, s, tgError, devices)}
     </div>
     <div class="row-end"><button class="btn btn-primary" type="submit">Salvar</button></div>
   </form>
+  <form method="post" action="/integrations/awesome-token" class="field-row" novalidate>
+    ${csrfField(c)}
+    <div class="field grow"><label for="aw-token">Chave da AwesomeAPI <span class="muted">(opcional, grátis)</span></label>
+      <input id="aw-token" name="token" autocomplete="off" spellcheck="false" placeholder="${s.awesome_token ? "chave salva — cole outra para trocar" : "cole aqui"}">
+      <p class="hint">Deixa o dólar ao vivo mais confiável: sem chave, a AwesomeAPI às vezes recusa por excesso de uso. Crie em awesomeapi.com.br.</p></div>
+    <div class="field field-end"><button class="btn btn-secondary" type="submit">Salvar</button></div>
+  </form>
 </section>`);
 }
 
