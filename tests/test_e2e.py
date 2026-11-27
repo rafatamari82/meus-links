@@ -582,6 +582,10 @@ class E2E(unittest.TestCase):
         # the top bar stays a bar on phones, and the dashboard starts right under it
         self.assertLess(m.locator(".sidebar").bounding_box()["height"], 120)
         self.assertLess(m.get_by_role("heading", name="Resumo", exact=True).bounding_box()["y"], 200)
+        m.get_by_role("link", name="Atualizar").click()
+        m.wait_for_url(re.compile(r"refresh=1"))
+        expect(m.get_by_text(re.compile(r"Atualizado às \d{2}:\d{2}"))).to_be_visible()
+        expect(m.get_by_text(re.compile(r"dólar R\$ 5,40 \(\d{2}:\d{2}\)"))).to_be_visible()
         bar.get_by_role("link", name="Vendas").click()
         expect(m.get_by_role("heading", name="Vendas", exact=True)).to_be_visible()
         bar.get_by_role("link", name="Trackeamento").click()

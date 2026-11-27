@@ -11,6 +11,7 @@ const TYPE_LABEL = { sale: "Venda", upsell: "Upsell", refund: "Reembolso", charg
 const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(1).replace(".", ",")}%` : "—");
 const ratio = (x) => (x == null ? "—" : `${x.toFixed(2).replace(".", ",")}x`);
 const ddmm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+const hhmm = (iso) => new Date(Date.parse(iso) - 3 * 36e5).toISOString().slice(11, 16);
 const RANGE_LABEL = { today: "Hoje", yesterday: "Ontem", "7d": "Últimos 7 dias", "30d": "Últimos 30 dias", month: "Este mês" };
 
 function rangeForm(range, extra = {}) {
@@ -81,8 +82,9 @@ export function resultsView(c, { s, range, byAd, srcFilter, netFilter = "", prod
   const maxNet = Math.max(1, ...networks.map((x) => Math.abs(x.revenue)));
   return page({ ...c, section: "results" }, "Resumo", html`
 <header class="page-head dash-head">
-  <div><h1 class="h-xl">Resumo</h1><p class="muted">${RANGE_LABEL[range.preset] || `${ddmm(range.from)} a ${ddmm(range.to)}`} · valores em ${cur}${s.rate_at ? ` · dólar R$ ${Number(s.usd_brl).toFixed(2).replace(".", ",")}` : ""}</p></div>
-  <a class="btn btn-primary" href="/results?${new URLSearchParams({ ...base, ...(srcFilter ? { source: srcFilter } : {}), ...(byAd ? { by: "ad" } : {}) })}">Atualizar</a>
+  <div><h1 class="h-xl">Resumo</h1><p class="muted">${RANGE_LABEL[range.preset] || `${ddmm(range.from)} a ${ddmm(range.to)}`} · valores em ${cur} · dólar R$ ${Number(s.usd_brl).toFixed(2).replace(".", ",")}${s.rate_at ? ` (${hhmm(s.rate_at)})` : " (não atualizado)"}</p></div>
+  <div class="refresh-box"><span class="muted small">Atualizado às ${hhmm(new Date().toISOString())}</span>
+  <a class="btn btn-primary" href="/results?${new URLSearchParams({ ...base, ...(srcFilter ? { source: srcFilter } : {}), ...(byAd ? { by: "ad" } : {}), refresh: "1" })}">Atualizar</a></div>
 </header>
 ${empty}
 <form class="card pad dash-filters" method="get" data-range>

@@ -44,7 +44,7 @@ function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
     <span class="set-value">R$ ${s.usd_brl.toFixed(4).replace(".", ",")}</span></div>
   ${s.rate_auto ? html`<form method="post" action="/settings/rate" class="set-row">${csrfField(c)}<button class="set-link" type="submit">Atualizar cotação agora</button></form>` : ""}
 </div>
-<p class="set-note">Dólar comercial do momento${s.rate_src ? ` (fonte: ${s.rate_src})` : ""}, atualizado a cada hora. Apps de banco e de câmbio podem mostrar um pouco acima, porque somam a margem deles.</p>
+<p class="set-note">Dólar comercial do momento${s.rate_src ? ` (fonte: ${s.rate_src})` : ""}, atualizado a cada 15 minutos. Apps de banco e de câmbio podem mostrar um pouco acima, porque somam a margem deles.${s.rate_err ? ` Falhas na última busca: ${s.rate_err}.` : ""}</p>
 
 <h2 class="set-title">Notificações de venda</h2>
 <div class="set-group">
@@ -81,7 +81,7 @@ export async function settingsPost(c, action) {
     const before = await getSettings(c.db);
     const after = await freshRates(c, before, { force: true });
     if (after.rate_at && after.rate_at !== before.rate_at) c.flash("success", `Dólar atualizado: R$ ${after.usd_brl.toFixed(4).replace(".", ",")}.`);
-    else c.flash("error", "Não consegui buscar a cotação agora. Tente de novo em alguns minutos.");
+    else c.flash("error", `Não consegui buscar a cotação agora (${after.rate_err || "sem resposta"}).`);
   } else if (action === "email") {
     await setSetting(c.db, "email_on", f.get("on") ? "1" : "0");
   } else if (action === "refunds") {

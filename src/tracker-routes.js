@@ -44,6 +44,7 @@ export async function getSettings(db) {
     rate_auto: s.rate_auto !== "0",
     rate_at: s.rate_at || "",
     rate_src: s.rate_src || "",
+    rate_err: s.rate_err || "",
     gscript_at: s.gscript_at || "",
     email_on: s.email_on !== "0",
     templates: Object.fromEntries(Object.entries(T.TEMPLATE_DEFAULTS).map(([k, d]) => [k, s[`tpl_${k}`] || d])),
@@ -51,8 +52,13 @@ export async function getSettings(db) {
 }
 
 // Quote sources, tried in order. Each returns { usd, eur } in reais, or throws.
+// Live sources first; the last two publish once a day and are only a fallback.
 const RATE_SOURCES = [
   ["AwesomeAPI", "https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL", (j) => ({ usd: Number(j?.USDBRL?.bid), eur: Number(j?.EURBRL?.bid) })],
+  ["Binance (USDT/BRL)", `https://api.binance.com/api/v3/ticker/price?symbols=${encodeURIComponent('["USDTBRL","EURUSDT"]')}`, (j) => {
+    const m = Object.fromEntries((Array.isArray(j) ? j : []).map((x) => [x.symbol, Number(x.price)]));
+    return { usd: m.USDTBRL, eur: m.USDTBRL * m.EURUSDT };
+  }],
   ["ExchangeRate-API", "https://open.er-api.com/v6/latest/USD", (j) => ({ usd: Number(j?.rates?.BRL), eur: Number(j?.rates?.BRL) / Number(j?.rates?.EUR) })],
   ["Frankfurter", "https://api.frankfurter.dev/v1/latest?base=USD&symbols=BRL,EUR", (j) => ({ usd: Number(j?.rates?.BRL), eur: Number(j?.rates?.BRL) / Number(j?.rates?.EUR) })],
 ];
@@ -63,8 +69,9 @@ let ratesFailedAt = 0;
 export async function freshRates(c, s, { force = false } = {}) {
   if (!s.rate_auto) return s;
   if (!force && Date.now() - ratesFailedAt < 10 * 60e3) return s; // all sources were down a moment ago
-  if (!force && s.rate_at && Date.now() - Date.parse(s.rate_at) < 36e5) return s;
+  if (!force && s.rate_at && Date.now() - Date.parse(s.rate_at) < 15 * 60e3) return s;
   const fetcher = c.env.__ratesFetch || fetch;
+  const errors = [];
   for (const [name, url, read] of RATE_SOURCES) {
     try {
       const r = await fetcher(url, { headers: { "User-Agent": "cutti.us (cotacao)", Accept: "application/json" }, signal: AbortSignal.timeout(2500) });
@@ -76,13 +83,16 @@ export async function freshRates(c, s, { force = false } = {}) {
       await setSetting(c.db, "eur_brl", eur.toFixed(4));
       await setSetting(c.db, "rate_at", at);
       await setSetting(c.db, "rate_src", name);
-      return { ...s, usd_brl: usd, eur_brl: eur, rate_at: at, rate_src: name };
+      await setSetting(c.db, "rate_err", errors.join("; "));
+      return { ...s, usd_brl: usd, eur_brl: eur, rate_at: at, rate_src: name, rate_err: errors.join("; ") };
     } catch (e) {
+      errors.push(`${name}: ${e?.name === "TimeoutError" ? "demorou" : e?.message || e}`);
       console.error("cotação", name, e?.message || e);
     }
   }
   ratesFailedAt = Date.now();
-  return s;
+  await setSetting(c.db, "rate_err", errors.join("; "));
+  return { ...s, rate_err: errors.join("; ") };
 }
 
 export async function setSetting(db, key, value) {
@@ -491,7 +501,8 @@ export function readRange(params) {
 const sumRev = (type, cents) => (type === "refund" || type === "chargeback" ? -cents : cents);
 
 export async function resultsPage(c) {
-  const s = await freshRates(c, await getSettings(c.db));
+  const force = c.url.searchParams.get("refresh") === "1";
+  const s = await freshRates(c, await getSettings(c.db), { force });
   const range = readRange(c.url.searchParams);
   const byAd = c.url.searchParams.get("by") === "ad";
   const srcFilter = c.url.searchParams.get("source") || "";
