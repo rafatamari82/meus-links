@@ -497,3 +497,8 @@ a.set-row:hover { background: var(--color-surface); }
 .net-logo.nl-smartadv { width: 88px; height: 17px; } .plat-tile .net-logo.nl-smartadv, .plat-setup .net-logo.nl-smartadv { width: 105px; height: 20px; }
 .net-logo.nl-smashloud { width: 61px; height: 18px; } .plat-tile .net-logo.nl-smashloud, .plat-setup .net-logo.nl-smashloud { width: 73px; height: 21px; }
 .net-logo { object-fit: contain; max-width: none; }
+
+/* Installed app on the phone: iOS blurs whatever sits right under the clock bar, so the top bar starts a little lower. */
+@media (display-mode: standalone) and (max-width: 760px) {
+  .shell { padding-top: 40px; }
+}
