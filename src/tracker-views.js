@@ -4,7 +4,7 @@ import { countryName } from "./core.js";
 
 const flag = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((ch) => 127397 + ch.charCodeAt(0))) : "");
 const place = (cc) => (cc && cc !== "XX" ? `${flag(cc)} ${countryName(cc)}` : "");
-import { fmtMoney, googleAdsScript, NETWORKS, renderTemplate, SAMPLE_VARS, SOURCES, TEMPLATE_VARS } from "./tracker.js";
+import { convert, fmtMoney, googleAdsScript, NETWORKS, renderTemplate, SAMPLE_VARS, SOURCES, TEMPLATE_VARS } from "./tracker.js";
 
 const SOURCE_LABEL = { ...SOURCES, none: "Sem rastreio" };
 const TYPE_LABEL = { sale: "Venda", upsell: "Upsell", refund: "Reembolso", chargeback: "Chargeback" };
@@ -197,7 +197,7 @@ ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) =
 </section>`);
 }
 
-export function salesView(c, { s, range, sales, events, network = "" }) {
+export function salesView(c, { s, range, sales, events, network = "", days = {}, today = "" }) {
   return page({ ...c, section: "sales" }, "Vendas", html`
 <header class="page-head">
   <div><h1 class="h-xl">Vendas</h1><p class="muted">${sales.length} registro(s) · ${RANGE_LABEL[range.preset] || `${ddmm(range.from)} a ${ddmm(range.to)}`}</p></div>
@@ -206,16 +206,30 @@ export function salesView(c, { s, range, sales, events, network = "" }) {
 ${network ? html`<p><a class="chip-filter" href="/sales?${new URLSearchParams({ p: range.preset, ...(range.preset === "custom" ? { from: range.from, to: range.to } : {}) })}">${NETWORKS[network]?.name || network} <span aria-hidden="true">✕</span><span class="sr-only">tirar filtro</span></a></p>` : ""}
 ${sales.length ? html`<ul class="sale-list" aria-label="Vendas">${sales.map((v) => {
   const neg = v.type === "refund" || v.type === "chargeback";
-  return html`<li class="sale-item">
-    <div class="sale-main">
-      <strong>${v.product || NETWORKS[v.network]?.name || v.network}</strong>
-      <span class="hint">${fmtDateTime(v.at)} · ${NETWORKS[v.network]?.name || v.network}${place(v.country) ? ` · ${place(v.country)}` : ""}${v.click_id ? ` · ${SOURCE_LABEL[v.source] || v.source}${v.campaign ? ` · ${v.campaign}` : ""}` : ""}</span>
-    </div>
-    <div class="sale-side">
-      <span class="sale-amount ${neg ? "neg" : ""}">${neg ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}</span>
-      <span class="badge ${neg ? "badge-warning" : "badge-success"}">${TYPE_LABEL[v.type]}</span>
-    </div>
-  </li>`;
+  const net = NETWORKS[v.network]?.name || v.network;
+  const day = days[v.day];
+  const isToday = v.day === today;
+  const rows = [
+    ["Produto", v.product], ["Valor", `${neg ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}`],
+    ["Em reais", v.currency !== "BRL" ? `${neg ? "−" : ""}${fmtMoney(convert(v.amount_cents, v.currency, "BRL", s), "BRL")}` : ""],
+    ["Rede", net], ["País", place(v.country)], ["Origem", v.click_id ? SOURCE_LABEL[v.source] || v.source : "Sem clique rastreado"],
+    ["Campanha", v.campaign], ["Anúncio", v.ad], ["Palavra-chave", v.keyword], ["Pedido", v.txid], ["Data", fmtDateTime(v.at)],
+    [isToday ? "Vendas hoje" : "Vendas no dia", day ? String(day.sales) : ""],
+    [isToday ? "Faturamento hoje" : "Faturamento no dia", day ? fmtMoney(day.revenue, s.currency) : ""],
+  ].filter(([, x]) => x);
+  return html`<li class="sale-item"><details class="sale-details">
+    <summary class="sale-sum">
+      <div class="sale-main">
+        <strong>${v.product || net}</strong>
+        <span class="hint">${fmtDateTime(v.at)} · ${net}</span>
+      </div>
+      <div class="sale-side">
+        <span class="sale-amount ${neg ? "neg" : ""}">${neg ? "−" : ""}${fmtMoney(v.amount_cents, v.currency)}</span>
+        <span class="badge ${neg ? "badge-warning" : "badge-success"}">${TYPE_LABEL[v.type]}</span>
+      </div>
+    </summary>
+    <dl class="sale-facts">${rows.map(([k, x]) => html`<div><dt>${k}</dt><dd>${x}</dd></div>`)}</dl>
+  </details></li>`;
 })}</ul>` : ""}
 <section class="card table-wrap sales-table-wrap">
   ${sales.length ? html`

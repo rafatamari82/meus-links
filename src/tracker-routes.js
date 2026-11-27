@@ -667,14 +667,26 @@ export async function salesPage(c) {
   const s = ratesLater(c, await getSettings(c.db));
   const range = readRange(c.url.searchParams);
   const network = T.NETWORKS[c.url.searchParams.get("network")] ? c.url.searchParams.get("network") : "";
-  const [sales, events] = (await c.db.batch([
+  const [sales, events, dayRows] = (await c.db.batch([
     c.db.prepare(
       `select v.*, k.source, k.campaign, k.ad, k.keyword, k.country from tk_conversions v left join tk_clicks k on k.id = v.click_id
        where v.at >= ? and v.at < ?${network ? " and v.network = ?" : ""} order by v.at desc limit 300`,
     ).bind(range.start, range.end, ...(network ? [network] : [])),
     c.db.prepare("select * from tk_events order by id desc limit 40"),
+    // per-day totals (all networks), like "Vendas hoje" and "Faturamento hoje" in the sale e-mail
+    c.db.prepare(
+      `select substr(datetime(at, '-${SP_OFFSET_H} hours'), 1, 10) as d, type, currency, sum(amount_cents) as cents, count(*) as n
+       from tk_conversions where at >= ? and at < ? group by 1, 2, 3`,
+    ).bind(range.start, range.end),
   ])).map((r) => r.results || []);
-  return c.respond(TV.salesView(c.view(), { s, range, sales, events, network }));
+  const days = {};
+  for (const r of dayRows) {
+    const x = (days[r.d] ||= { sales: 0, revenue: 0 });
+    if (r.type === "sale" || r.type === "upsell") x.sales += r.n;
+    x.revenue += sumRev(r.type, T.convert(r.cents || 0, r.currency, s.currency, s));
+  }
+  for (const v of sales) v.day = new Date(Date.parse(v.at) - SP_OFFSET_H * 36e5).toISOString().slice(0, 10);
+  return c.respond(TV.salesView(c.view(), { s, range, sales, events, network, days, today: spToday() }));
 }
 
 export async function integrationsPage(c, extra = {}, status = 200) {

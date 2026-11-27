@@ -612,6 +612,16 @@ class E2E(unittest.TestCase):
         bar.get_by_role("link", name="Vendas").click()
         expect(m.get_by_role("heading", name="Vendas", exact=True)).to_be_visible()
         expect(bar.get_by_role("link", name="Trackeamento")).to_have_count(0)
+        m.goto(self.base + "/sales?p=30d")
+        item = m.locator(".sale-item").first
+        facts = item.locator(".sale-facts")
+        expect(facts).to_be_hidden()
+        item.locator("summary").click()
+        expect(facts).to_be_visible()
+        for k in ["Valor", "Rede", "Origem", "Pedido", "Data"]:
+            expect(facts.locator("dt", has_text=k).first).to_be_visible()
+        expect(facts.locator("dt", has_text=re.compile("^Faturamento (hoje|no dia)$"))).to_be_visible()
+        m.screenshot(path="/tmp/mobile-vendas.png")
         bar.get_by_role("link", name="Ajustes").click()
         m.get_by_role("link", name=re.compile("^Trackeamento")).click()
         expect(m.get_by_role("heading", name="Trackeamento", exact=True)).to_be_visible()
