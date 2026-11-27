@@ -361,3 +361,4 @@ a.set-row:hover { background: var(--color-surface); }
 .refresh-box { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .small { font-size: var(--text-xs); }
 .btn-icon { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 760px) { .shell { grid-template-rows: auto 1fr; align-content: start; } .sidebar { align-self: start; } }

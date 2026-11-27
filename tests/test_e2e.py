@@ -724,8 +724,9 @@ class E2E(unittest.TestCase):
     def test_t03_tracker_pages_fit_mobile(self):
         m = self.browser.new_context(viewport={"width": 390, "height": 844},
                                      storage_state=self.ctx.storage_state()).new_page()
-        for path in ["/results", "/sales", "/integrations", "/tracking", "/settings"]:
+        for path in ["/results", "/sales?p=today&network=clickadv", "/integrations", "/tracking", "/settings", "/links", "/domains"]:
             m.goto(self.base + path)
+            self.assertLess(m.locator(".sidebar").bounding_box()["height"], 90, f"{path}: barra do topo alta demais")
             width = m.evaluate("document.documentElement.scrollWidth")
             self.assertLessEqual(width, 390, f"{path} rola para o lado no celular")
         m.context.close()
