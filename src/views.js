@@ -373,7 +373,7 @@ function breakdownCard(title, rows, total) {
 </section>`;
 }
 
-export function statsView(c, { link, days, peak, refs, bots, blocked = 0, robotsBlocked = 0, vpnBlocked = 0, robots = [], last30, countries = [], devices = [], systems = [] }) {
+export function statsView(c, { link, days, peak, refs, bots, blocked = 0, blockedList = [], robotsBlocked = 0, vpnBlocked = 0, robots = [], last30, countries = [], devices = [], systems = [] }) {
   const su = `${c.scheme}://${link.domain_name}/${link.slashtag}`;
   const bars = days.map(([label, n], i) => {
     const h = n ? (n / peak) * 110 : 0;
@@ -416,6 +416,16 @@ export function statsView(c, { link, days, peak, refs, bots, blocked = 0, robots
   ${robotsBlocked ? html`<p class="hint">${robotsBlocked} ${robotsBlocked === 1 ? "acesso de robô foi barrado" : "acessos de robôs foram barrados"} pelo filtro anti-robô.</p>` : ""}
   ${bots ? html`<p class="hint">${bots} ${bots === 1 ? "acesso de robôs e prévias de redes sociais não entrou" : "acessos de robôs e prévias de redes sociais não entraram"} na contagem.</p>` : ""}
 </section>
+${blockedList.length ? html`<section class="card table-wrap robots">
+  <h2 class="h-md pad-x">Acessos bloqueados por país</h2>
+  <p class="hint pad-x">Quem abriu o link de um país bloqueado e viu a página “Oi Curioso!”. Não conta como clique.</p>
+  <table class="simple"><thead><tr><th scope="col">Quando</th><th scope="col">País</th><th scope="col">Aparelho</th></tr></thead>
+  <tbody>${blockedList.map((r) => html`<tr>
+    <td data-label="Quando">${fmtDateTime(r.at)}</td>
+    <td data-label="País">${r.country ? countryName(r.country) : "Desconhecido"}</td>
+    <td data-label="Aparelho">${[r.device, r.os].filter(Boolean).join(" · ") || "—"}</td>
+  </tr>`)}</tbody></table>
+</section>` : ""}
 ${robots.length ? html`<section class="card table-wrap robots">
   <h2 class="h-md pad-x">Acessos de robôs e VPN</h2>
   <p class="hint pad-x">Os últimos ${robots.length}. O IP e o local são guardados só de robôs e VPNs barradas, nunca das pessoas.</p>

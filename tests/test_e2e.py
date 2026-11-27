@@ -412,6 +412,9 @@ class E2E(unittest.TestCase):
         self.assertEqual(self.clicks_for("geobloq"), 2)  # the blocked visit is not counted
         self.page.get_by_role("link", name="Ver estatísticas de geobloq").click()
         expect(self.page.get_by_text("1 acesso de país bloqueado foi barrado")).to_be_visible()
+        box = self.page.locator("section.robots", has_text="Acessos bloqueados por país")
+        expect(box.locator("tbody tr")).to_have_count(1)
+        expect(box.locator("tbody tr")).to_contain_text("Brasil")
 
     def test_f06_allow_only(self):
         self.create("https://exemplo.com/geo2", "geolib")

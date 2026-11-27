@@ -508,6 +508,10 @@ async function linkStats(c, id) {
     "select at, ip, city, region, country, asn, as_org, user_agent, blocked from clicks where link_id = ? and (is_bot = 1 or blocked = 3) order by id desc limit 50",
   ).bind(id).all()).results;
   const blocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 1").bind(id).first()).n;
+  // People stopped by the country rule: when, from where, on what (no IP: these are people).
+  const blockedList = (await c.db.prepare(
+    "select at, country, device, os from clicks where link_id = ? and is_bot = 0 and blocked = 1 order by id desc limit 50",
+  ).bind(id).all()).results;
   const breakdown = async (col) => (await c.db.prepare(
     `select coalesce(${col}, '') as k, count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 0 group by k order by n desc limit 10`,
   ).bind(id).all()).results;
@@ -516,7 +520,7 @@ async function linkStats(c, id) {
   const systems = (await breakdown("os")).map((r) => ({ label: r.k || "Desconhecido", n: r.n }));
   const last30 = days.reduce((a, [, n]) => a + n, 0);
   return c.respond(V.statsView(c.view(), {
-    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, robotsBlocked, vpnBlocked, robots, last30, countries, devices, systems,
+    link, days, peak: Math.max(1, ...days.map(([, n]) => n)), refs, bots, blocked, blockedList, robotsBlocked, vpnBlocked, robots, last30, countries, devices, systems,
   }));
 }
 
