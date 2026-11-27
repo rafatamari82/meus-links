@@ -64,7 +64,8 @@ function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
   ${emailReady ? sw("email", "on", s.email_on, html`Aviso por e-mail<span class="hint">${emailTo}</span>`) : html`<div class="set-row"><span class="set-label">Aviso por e-mail<span class="hint">Falta ativar o envio de e-mail na Cloudflare</span></span></div>`}
   ${sw("refunds", "on", s.notify_refunds, "Avisar reembolsos")}
   <form method="post" action="/integrations/notify-test" class="set-row">${csrfField(c)}<input type="hidden" name="back" value="/settings">
-    <button class="set-link" type="submit">Testar aviso</button></form>
+    <span class="set-label">Testar aviso<span class="hint">Manda uma venda de exemplo para os seus aparelhos</span></span>
+    <button class="btn btn-primary btn-sm btn-icon" type="submit">${raw('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>')}Testar</button></form>
 </div>
 <p class="set-note">No iPhone, abra o Cutti pelo ícone da Tela de Início antes de ativar.</p>
 
