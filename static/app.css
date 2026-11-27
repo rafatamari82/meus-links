@@ -533,3 +533,41 @@ a.set-row:hover { background: var(--color-surface); }
 .perf-foot { display: flex; justify-content: center; gap: var(--space-6); padding: var(--space-3) var(--space-5); border-top: 1px solid var(--color-border); margin: 0 var(--space-5); font-size: var(--text-sm); }
 .perf-end-1 { fill: #0565e6; stroke: #fff; stroke-width: 2; }
 .perf-end-2 { fill: #ea6a1f; stroke: #fff; stroke-width: 2; }
+
+/* Meta R$ 100 mil */
+.goal { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-5); }
+.medal { width: 64px; height: 64px; flex: none; }
+.goal-main { flex: 1; min-width: 0; }
+.goal-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+.goal-level { font-size: var(--text-base); }
+.goal-next { color: var(--color-text-muted); font-size: var(--text-sm); }
+.goal-bar svg { display: block; width: 100%; height: 18px; margin: var(--space-2) 0; }
+.goal-bg { fill: #d8dee8; }
+.goal-tick { fill: rgba(255, 255, 255, .9); }
+.goal-fg { fill: #0565e6; }
+.goal-start { fill: #8ea3c2; } .goal-bronze { fill: #d4692e; } .goal-silver { fill: #8d99a8; } .goal-gold { fill: #e0a516; } .goal-diamond { fill: #19a8d6; }
+.goal-foot { display: flex; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; color: var(--color-text-muted); font-size: var(--text-sm); }
+/* medal colours per level */
+.medal .m-star, .medal .m-wing { fill: rgba(255, 255, 255, .92); }
+.medal-start .m-ring { fill: #6f86a8; } .medal-start .m-face { fill: #9fb2cd; }
+.medal-bronze .m-ring { fill: #8a3f14; } .medal-bronze .m-face { fill: #d4692e; }
+.medal-silver .m-ring { fill: #5f6b79; } .medal-silver .m-face { fill: #b3bdc9; }
+.medal-gold .m-ring { fill: #a0700a; } .medal-gold .m-face { fill: #f1bd2b; }
+.medal-diamond .m-ring { fill: #0b6f93; } .medal-diamond .m-face { fill: #3cc4ee; }
+@media (max-width: 760px) {
+  .goal { gap: var(--space-3); padding: var(--space-3) var(--space-4); }
+  .medal { width: 48px; height: 48px; }
+  .goal-foot { font-size: var(--text-xs); }
+}
+
+/* goal bar built from plain blocks (rounded ends stay round) */
+.goal-bar { position: relative; height: 16px; border-radius: 999px; background: #d8dee8; overflow: hidden; margin: var(--space-2) 0; }
+.goal-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: #0565e6; }
+.goal-fill.goal-start { background: #8ea3c2; } .goal-fill.goal-bronze { background: #d4692e; } .goal-fill.goal-silver { background: #8d99a8; }
+.goal-fill.goal-gold { background: #e0a516; } .goal-fill.goal-diamond { background: #19a8d6; }
+.goal-bar .goal-tick { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255, 255, 255, .85); }
+.t-10 { left: 10%; } .t-25 { left: 25%; } .t-50 { left: 50%; }
+.goal-foot { flex-wrap: nowrap; white-space: nowrap; }
+@media (max-width: 760px) { .goal-lbl { display: none; } }
+.w-0 { width: 0%; }.w-1 { width: 1%; }.w-2 { width: 2%; }.w-3 { width: 3%; }.w-4 { width: 4%; }.w-5 { width: 5%; }.w-6 { width: 6%; }.w-7 { width: 7%; }.w-8 { width: 8%; }.w-9 { width: 9%; }.w-10 { width: 10%; }.w-11 { width: 11%; }.w-12 { width: 12%; }.w-13 { width: 13%; }.w-14 { width: 14%; }.w-15 { width: 15%; }.w-16 { width: 16%; }.w-17 { width: 17%; }.w-18 { width: 18%; }.w-19 { width: 19%; }.w-20 { width: 20%; }.w-21 { width: 21%; }.w-22 { width: 22%; }.w-23 { width: 23%; }.w-24 { width: 24%; }.w-25 { width: 25%; }.w-26 { width: 26%; }.w-27 { width: 27%; }.w-28 { width: 28%; }.w-29 { width: 29%; }.w-30 { width: 30%; }.w-31 { width: 31%; }.w-32 { width: 32%; }.w-33 { width: 33%; }.w-34 { width: 34%; }.w-35 { width: 35%; }.w-36 { width: 36%; }.w-37 { width: 37%; }.w-38 { width: 38%; }.w-39 { width: 39%; }.w-40 { width: 40%; }.w-41 { width: 41%; }.w-42 { width: 42%; }.w-43 { width: 43%; }.w-44 { width: 44%; }.w-45 { width: 45%; }.w-46 { width: 46%; }.w-47 { width: 47%; }.w-48 { width: 48%; }.w-49 { width: 49%; }.w-50 { width: 50%; }.w-51 { width: 51%; }.w-52 { width: 52%; }.w-53 { width: 53%; }.w-54 { width: 54%; }.w-55 { width: 55%; }.w-56 { width: 56%; }.w-57 { width: 57%; }.w-58 { width: 58%; }.w-59 { width: 59%; }.w-60 { width: 60%; }.w-61 { width: 61%; }.w-62 { width: 62%; }.w-63 { width: 63%; }.w-64 { width: 64%; }.w-65 { width: 65%; }.w-66 { width: 66%; }.w-67 { width: 67%; }.w-68 { width: 68%; }.w-69 { width: 69%; }.w-70 { width: 70%; }.w-71 { width: 71%; }.w-72 { width: 72%; }.w-73 { width: 73%; }.w-74 { width: 74%; }.w-75 { width: 75%; }.w-76 { width: 76%; }.w-77 { width: 77%; }.w-78 { width: 78%; }.w-79 { width: 79%; }.w-80 { width: 80%; }.w-81 { width: 81%; }.w-82 { width: 82%; }.w-83 { width: 83%; }.w-84 { width: 84%; }.w-85 { width: 85%; }.w-86 { width: 86%; }.w-87 { width: 87%; }.w-88 { width: 88%; }.w-89 { width: 89%; }.w-90 { width: 90%; }.w-91 { width: 91%; }.w-92 { width: 92%; }.w-93 { width: 93%; }.w-94 { width: 94%; }.w-95 { width: 95%; }.w-96 { width: 96%; }.w-97 { width: 97%; }.w-98 { width: 98%; }.w-99 { width: 99%; }.w-100 { width: 100%; }
+.goal-fill.goal-start { background: #0565e6; }

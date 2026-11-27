@@ -37,6 +37,44 @@ function stat(label, value, tone = "") {
 }
 
 // "Desempenho": running totals of this period (lines) against the period before (soft areas), two axes.
+// Goal: lifetime revenue in reais up to R$ 100 mil, with levels and a medal drawn for Cutti.
+const GOAL_LEVELS = [
+  { at: 0, name: "Iniciante", tone: "start" },
+  { at: 10_000_00, name: "Bronze", tone: "bronze" },
+  { at: 25_000_00, name: "Prata", tone: "silver" },
+  { at: 50_000_00, name: "Ouro", tone: "gold" },
+  { at: 100_000_00, name: "Diamante", tone: "diamond" },
+];
+const GOAL = 100_000_00;
+function medal(tone) {
+  return raw(`<svg class="medal medal-${tone}" viewBox="0 0 64 64" aria-hidden="true">
+  <path class="m-ring" d="M32 3 57 17.5v29L32 61 7 46.5v-29z"/>
+  <path class="m-face" d="M32 9 52 20.5v23L32 55 12 43.5v-23z"/>
+  <path class="m-star" d="m32 17 4.1 8.6 9.4 1.2-6.9 6.5 1.8 9.3L32 38.1l-8.4 4.5 1.8-9.3-6.9-6.5 9.4-1.2z"/>
+  <path class="m-wing" d="M22 47.5 32 42l10 5.5-3 2.6-7-3.8-7 3.8z"/>
+</svg>`);
+}
+function goalCard(cents) {
+  const v = Math.max(0, Math.round(cents));
+  const level = [...GOAL_LEVELS].reverse().find((l) => v >= l.at);
+  const next = GOAL_LEVELS.find((l) => l.at > v);
+  const pct = Math.min(100, (v / GOAL) * 100);
+  const brl = (x) => fmtMoney(x, "BRL").replace(/,\d{2}$/, "");
+  const done = v >= GOAL;
+  return html`<section class="card goal">
+  ${medal(level.tone)}
+  <div class="goal-main">
+    <div class="goal-top"><strong class="goal-level">${level.name}</strong>
+      <span class="goal-next">${done ? "Meta de R$ 100 mil batida!" : `Rumo ao nível ${next.name}`}</span></div>
+    <div class="goal-bar" role="progressbar" aria-label="Meta de faturamento" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}">
+      <span class="goal-fill goal-${level.tone} w-${pct > 0 ? Math.max(2, Math.round(pct)) : 0}"></span>
+      <span class="goal-tick t-10"></span><span class="goal-tick t-25"></span><span class="goal-tick t-50"></span>
+    </div>
+    <div class="goal-foot"><span><span class="goal-lbl">Faturamento: </span>${brl(v)} / R$ 100.000</span><span>${done ? "Parabéns!" : `${brl(GOAL - v)} restantes`}</span></div>
+  </div>
+</section>`;
+}
+
 function perfChart(sr, cur, keep) {
   const W = 1000, H = 300, L = 72, R = 72, T = 16, B = 40;
   const pw = W - L - R, ph = H - T - B;
@@ -110,7 +148,7 @@ function perfChart(sr, cur, keep) {
 </section>`;
 }
 
-export function resultsView(c, { s, range, byAd, srcFilter, netFilter = "", prodFilter = "", list, tot, series, hasAny, sources = [], networks = [], products = [], productNames = [], money = {}, audience = { age: [], gender: [] } }) {
+export function resultsView(c, { s, range, byAd, srcFilter, netFilter = "", prodFilter = "", list, tot, series, hasAny, sources = [], networks = [], products = [], productNames = [], money = {}, lifetimeBrl = 0, audience = { age: [], gender: [] } }) {
   const cur = s.currency;
   const m = (x) => (x == null ? "—" : fmtMoney(x, cur));
   const tab = (label, params, on) => html`<a class="tab ${on ? "is-current" : ""}" href="/results?${new URLSearchParams(params)}" ${on ? raw('aria-current="page"') : ""}>${label}</a>`;
@@ -167,6 +205,7 @@ ${empty}
   <div class="m-kpi m-kpi-dark"><p class="m-kpi-label">Vendas</p><p class="m-kpi-value">${tot.sales}</p></div>
   <div class="m-kpi m-kpi-outline"><p class="m-kpi-label">Reembolsos</p><p class="m-kpi-value">${tot.refunds}</p></div>
 </div>
+${goalCard(lifetimeBrl)}
 ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) => html`
   <a class="net-card" href="/sales?${new URLSearchParams({ ...base, network: n.network })}">
     <span class="net-name">${netBrand(n.network, c.assetVersion)}</span>
