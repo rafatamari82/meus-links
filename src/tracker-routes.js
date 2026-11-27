@@ -28,6 +28,16 @@ export async function getSettings(db) {
     for (const k of ["sale_title", "sale_body", "refund_title", "refund_body"]) delete s[`tpl_${k}`];
     s.tpl_v2 = "1";
   }
+  if (s.tpl_v3 !== "1") {
+    const stmts = [];
+    for (const k of ["sale_title", "refund_title"]) {
+      const v = s[`tpl_${k}`];
+      if (v && v.includes("Cutti informa")) { s[`tpl_${k}`] = v.replace("Cutti informa", "Gringa Ads informa"); stmts.push(db.prepare("update settings set value = ? where key = ?").bind(s[`tpl_${k}`], `tk_tpl_${k}`)); }
+    }
+    stmts.push(db.prepare("insert into settings (key, value) values ('tk_tpl_v3', '1') on conflict(key) do update set value = '1'"));
+    await db.batch(stmts);
+    s.tpl_v3 = "1";
+  }
   if (!s.vapid_pub || !s.vapid_priv) {
     const k = await newVapidKeys();
     await db.batch([
@@ -292,7 +302,7 @@ async function saleMessage(db, s, network, p, click) {
 function messageFrom(s, vars, refund) {
   const t = s.templates;
   return {
-    title: T.renderTemplate(refund ? t.refund_title : t.sale_title, vars) || "Cutti",
+    title: T.renderTemplate(refund ? t.refund_title : t.sale_title, vars) || "Gringa Ads",
     body: T.renderTemplate(refund ? t.refund_body : t.sale_body, vars),
     refund, vars,
   };
@@ -339,17 +349,17 @@ export function saleEmail(m, panel) {
     ["Produto", v.produto], ["Valor", v.valor], ["Em reais", v.valor_painel], ["Rede", v.rede], ["País", v.pais], ["Origem", v.origem],
     ["Campanha", v.campanha], ["Anúncio", v.anuncio], ["Pedido", v.pedido], ["Vendas hoje", v.hoje], ["Faturamento hoje", v.total_hoje],
   ].filter(([, x]) => x);
-  const text = `${m.title}\n${m.body}\n\n${rows.map(([k, x]) => `${k}: ${x}`).join("\n")}\n\nVer no Cutti: ${panel}/sales`;
+  const text = `${m.title}\n${m.body}\n\n${rows.map(([k, x]) => `${k}: ${x}`).join("\n")}\n\nVer no Gringa Ads: ${panel}/sales`;
   const html = `<!doctype html><html><body style="margin:0;background:#f2f5fa;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0a0a0a">
 <div style="max-width:480px;margin:0 auto;padding:24px 16px">
-<div style="background:linear-gradient(135deg,#0447a8,#02235b);color:#fff;border-radius:16px;padding:20px 22px">
+<div style="background:linear-gradient(135deg,#0b5f7e,#03384b);color:#fff;border-radius:16px;padding:20px 22px">
 <div style="font-size:14px;opacity:.9">${escHtml(m.refund ? "Reembolso" : "Nova venda")}</div>
 <div style="font-size:26px;font-weight:700;margin-top:4px">${escHtml(m.title)}</div>
 <div style="font-size:14px;opacity:.9;margin-top:6px">${escHtml(m.body)}</div></div>
 <table style="width:100%;margin-top:16px;background:#fff;border-radius:14px;border-collapse:separate;border-spacing:0;font-size:15px">
 ${rows.map(([k, x], i) => `<tr><td style="padding:12px 16px;color:#5b5b63;${i ? "border-top:1px solid #e0e6ef;" : ""}">${escHtml(k)}</td><td style="padding:12px 16px;text-align:right;font-weight:600;${i ? "border-top:1px solid #e0e6ef;" : ""}">${escHtml(x)}</td></tr>`).join("")}
 </table>
-<p style="text-align:center;margin:20px 0"><a href="${escHtml(panel)}/sales" style="display:inline-block;background:#062a6b;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:10px">Ver no Cutti</a></p>
+<p style="text-align:center;margin:20px 0"><a href="${escHtml(panel)}/sales" style="display:inline-block;background:#03384b;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:10px">Ver no Gringa Ads</a></p>
 </div></body></html>`;
   return { text, html };
 }
@@ -395,7 +405,7 @@ async function sendSaleEmail(binding, m, panel, to) {
   const from = `vendas@${domain}`;
   let first;
   try {
-    await binding.send({ from: { email: from, name: "Cutti" }, to, subject: m.title, text, html });
+    await binding.send({ from: { email: from, name: "Gringa Ads" }, to, subject: m.title, text, html });
     return;
   } catch (e) {
     first = e;
@@ -403,7 +413,7 @@ async function sendSaleEmail(binding, m, panel, to) {
   // Older runtimes or Email Routing alone: send the raw message.
   try {
     const { EmailMessage } = await import("cloudflare:email");
-    await binding.send(new EmailMessage(from, to, rawEmail({ from, fromName: "Cutti", to, subject: m.title, text, html, domain })));
+    await binding.send(new EmailMessage(from, to, rawEmail({ from, fromName: "Gringa Ads", to, subject: m.title, text, html, domain })));
   } catch (e) {
     throw new Error(`e-mail: ${first?.code || ""} ${first?.message || first} / ${e?.code || ""} ${e?.message || e}`.trim());
   }
@@ -828,8 +838,8 @@ export async function integrationsPost(c, action) {
     const r = await notify(c.db, s, { ...messageFrom(s, T.SAMPLE_VARS, false), vars: T.SAMPLE_VARS }, c.env.__notifyFetch || fetch, { email: c.env.EMAIL, emailTo: c.env.EMAIL_TO, panel: `https://${c.panelHost()}` });
     const where = [r.phones ? `${r.phones} celular(es)` : "", r.email ? "e-mail" : "", r.telegram ? "Telegram" : ""].filter(Boolean).join(", ");
     if (!r.sent) c.flash("error", "Nenhum aviso configurado ainda.");
-    else if (r.errors.length) c.flash("error", `Não foi: ${r.errors.join("; ")}${r.errors.some((e) => /removido/.test(e)) ? ". Abra o Cutti pelo ícone e toque em Ativar de novo." : ""}`);
-    else if (!r.phones) c.flash("error", `Enviado só para: ${where}. Nenhum celular está com aviso ativado: abra o Cutti pelo ícone da tela de início, vá em Ajustes e toque em Ativar.`);
+    else if (r.errors.length) c.flash("error", `Não foi: ${r.errors.join("; ")}${r.errors.some((e) => /removido/.test(e)) ? ". Abra o Gringa Ads pelo ícone e toque em Ativar de novo." : ""}`);
+    else if (!r.phones) c.flash("error", `Enviado só para: ${where}. Nenhum celular está com aviso ativado: abra o Gringa Ads pelo ícone da tela de início, vá em Ajustes e toque em Ativar.`);
     else c.flash("success", `Aviso de teste enviado para: ${where}. Olhe o celular.`);
   } else if (action === "templates") {
     if (f.get("reset")) {

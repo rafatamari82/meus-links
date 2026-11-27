@@ -1,16 +1,16 @@
 {
-  "name": "Cutti",
-  "short_name": "Cutti",
+  "name": "Gringa Ads",
+  "short_name": "Gringa Ads",
   "description": "Links, vendas e resultados das suas campanhas.",
   "lang": "pt-BR",
   "start_url": "/results",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#02235b",
-  "theme_color": "#02235b",
+  "background_color": "#03384b",
+  "theme_color": "#03384b",
   "icons": [
-    { "src": "/static/logo-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/static/logo-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/static/logo-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/static/ga-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/ga-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/ga-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

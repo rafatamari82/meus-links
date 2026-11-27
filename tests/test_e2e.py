@@ -541,8 +541,8 @@ class E2E(unittest.TestCase):
 
     def test_t05_cutti_app_install_and_push(self):
         p = self.page
-        self.assertEqual(p.request.get(self.base + "/static/manifest.webmanifest").json()["name"], "Cutti")
-        icon = p.request.get(self.base + "/static/logo-192.png")
+        self.assertEqual(p.request.get(self.base + "/static/manifest.webmanifest").json()["name"], "Gringa Ads")
+        icon = p.request.get(self.base + "/static/ga-192.png")
         self.assertEqual(icon.headers["content-type"], "image/png")
         self.assertEqual(icon.body()[:4], b"\x89PNG")
         self.assertIn("showNotification", p.request.get(self.base + "/sw.js").text())
@@ -580,7 +580,7 @@ class E2E(unittest.TestCase):
         expect(p.locator("#tpl-sale_title")).to_have_value("🤑 Caiu {valor_painel}")
         p.locator("summary", has_text="Personalizar o texto do aviso").click()
         p.get_by_role("button", name="Voltar ao padrão").click()
-        expect(p.locator("#tpl-sale_title")).to_have_value("Cutti informa 🤑🚀")
+        expect(p.locator("#tpl-sale_title")).to_have_value("Gringa Ads informa 🤑🚀")
         expect(p.locator("#tpl-sale_body")).to_have_value("Venda realizada na {rede}: {valor_curto}")
         expect(p.locator('[data-preview="sale"] [data-preview-body]')).to_have_text("Venda realizada na ClickBank: 87,50 USD")
 
@@ -881,7 +881,7 @@ class E2E(unittest.TestCase):
                             headers={"Content-Type": "application/json"}).json()
         self.assertFalse([x for x in r2["conversions"] if x["gclid"] == "GCLIDSCRIPT"])
         p.goto(self.base + "/tracking")
-        self.assertIn("want_conversions: true", p.get_by_label("Script do Cutti").input_value())
+        self.assertIn("want_conversions: true", p.get_by_label("Script do Gringa Ads").input_value())
 
     def test_t12_touch_prefetch_opens_right_page(self):
         p = self.page

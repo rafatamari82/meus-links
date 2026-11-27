@@ -131,7 +131,7 @@
     if (!canPush) {
       btn.disabled = true;
       status.textContent = ios && !standalone
-        ? "No iPhone, primeiro adicione o Cutti à Tela de Início e abra pelo ícone. Depois toque aqui."
+        ? "No iPhone, primeiro adicione o Gringa Ads à Tela de Início e abra pelo ícone. Depois toque aqui."
         : "Este navegador não aceita notificações. Use o Chrome no Android ou o app instalado no iPhone.";
       return;
     }
@@ -181,7 +181,7 @@
     ["sale", "refund"].forEach(function (kind) {
       var vars = Object.assign({}, sample, kind === "refund" ? { emoji: "↩️", tipo: "Reembolso" } : {});
       var box = form.querySelector('[data-preview="' + kind + '"]');
-      box.querySelector("[data-preview-title]").textContent = renderTpl(form.elements[kind + "_title"].value, vars) || "Cutti";
+      box.querySelector("[data-preview-title]").textContent = renderTpl(form.elements[kind + "_title"].value, vars) || "Gringa Ads";
       box.querySelector("[data-preview-body]").textContent = renderTpl(form.elements[kind + "_body"].value, vars);
     });
   }

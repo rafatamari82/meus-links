@@ -330,7 +330,7 @@ export async function googleCallback(c) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.refresh_token) {
     c.flash("error", j.refresh_token === undefined && r.ok
-      ? "O Google não devolveu o acesso permanente. Remova o Cutti em myaccount.google.com/permissions e conecte de novo."
+      ? "O Google não devolveu o acesso permanente. Remova o Gringa Ads em myaccount.google.com/permissions e conecte de novo."
       : `O Google recusou a conexão (${j.error_description || j.error || r.status}). Confira o ID e a chave do cliente e o URI de redirecionamento.`);
     return c.redirect("/tracking#google");
   }
@@ -361,7 +361,7 @@ export async function googleBox(c, s, extra = {}) {
   let inner;
   if (!g.refresh) {
     inner = html`
-    <p class="muted">Conecte sua conta do Google Ads e o Cutti passa a trazer o gasto sozinho e a mandar cada venda para o Google na hora. Sem script e sem arquivo.</p>
+    <p class="muted">Conecte sua conta do Google Ads e o Gringa Ads passa a trazer o gasto sozinho e a mandar cada venda para o Google na hora. Sem script e sem arquivo.</p>
     <details class="utm" ${g.clientId ? "" : raw("open")}>
       <summary>1. Dados do seu app no Google (uma vez só)</summary>
       <ol class="steps">
@@ -409,7 +409,7 @@ export async function googleBox(c, s, extra = {}) {
         <form method="post" action="/tracking/google/sync">${csrfField(cv)}<button class="btn btn-secondary btn-sm" type="submit">Sincronizar agora</button></form>
         <form method="post" action="/tracking/google/disconnect" data-confirm="Desconectar o Google Ads? O gasto para de chegar sozinho.">${csrfField(cv)}<button class="btn btn-ghost btn-sm danger-text" type="submit">Desconectar</button></form>
       </div>
-      <p class="hint">Com a API conectada, apague o script do Cutti no Google Ads (Ferramentas → Scripts). Os dois juntos não duplicam o gasto, mas é melhor ter um caminho só.</p>
+      <p class="hint">Com a API conectada, apague o script do Gringa Ads no Google Ads (Ferramentas → Scripts). Os dois juntos não duplicam o gasto, mas é melhor ter um caminho só.</p>
     </div>`;
   }
   return html`<div id="google">${inner}</div>`;

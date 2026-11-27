@@ -25,7 +25,7 @@ const dateTimeFmt = new Intl.DateTimeFormat("pt-BR", {
 export const fmtDate = (iso) => (iso ? dateFmt.format(new Date(iso)) : "—");
 export const fmtDateTime = (iso) => (iso ? dateTimeFmt.format(new Date(iso)).replace(",", "") : "—");
 
-const ICON = raw('<img class="brand-logo" src="/static/logo-64.png" alt="" width="28" height="28">');
+const ICON = raw('<img class="brand-logo" src="/static/ga-64.png" alt="" width="28" height="28">');
 export const csrfField = (c) => html`<input type="hidden" name="csrf" value="${c.csrf}">`;
 
 function head(title, assetVersion) {
@@ -35,16 +35,16 @@ function head(title, assetVersion) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>${title} · Cutti</title>
+  <title>${title} · Gringa Ads</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=${assetVersion}">
-  <meta name="theme-color" content="#02235b">
-  <link rel="apple-touch-icon" href="/static/logo-apple-180.png">
+  <meta name="theme-color" content="#03384b">
+  <link rel="apple-touch-icon" href="/static/ga-apple-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Cutti">
+  <meta name="apple-mobile-web-app-title" content="Gringa Ads">
   <link rel="stylesheet" href="/static/tokens.css?v=${assetVersion}">
   <link rel="stylesheet" href="/static/app.css?v=${assetVersion}">
-  <link rel="icon" href="/static/logo-64.png" type="image/png">
+  <link rel="icon" href="/static/ga-64.png" type="image/png">
   <script src="/static/app.js?v=${assetVersion}" defer></script>
 </head>`;
 }
@@ -62,7 +62,7 @@ export function page(c, title, body) {
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
     ${c.section === "results" ? html`<span class="topbar-title" aria-hidden="true">Dashboard</span>` : ""}
-    <a class="brand" href="/results">${ICON}<span>Cutti</span></a>
+    <a class="brand" href="/results">${ICON}<span>Gringa Ads</span></a>
     <nav>${nav("/results", "Resumo", c.section === "results", TAB_ICONS.home)}${nav("/sales", "Vendas", c.section === "sales", TAB_ICONS.list)}${nav("/links", "Encurtador de Link", c.section === "links", TAB_ICONS.link)}${nav("/tracking", "Trackeamento", c.section === "tracking", TAB_ICONS.target)}${nav("/integrations", "Avisos e moeda", c.section === "integrations", TAB_ICONS.bell)}${nav("/domains", "Domínios", c.section === "domains", TAB_ICONS.globe)}${nav("/settings", "Ajustes", c.section === "settings", TAB_ICONS.gear)}</nav>
     <form method="post" action="/logout" class="sidebar-foot">${csrfField(c)}<button class="btn btn-ghost btn-sm" type="submit">Sair</button></form>
   </aside>
@@ -96,7 +96,7 @@ function tabItem(href, label, icon, active) {
 function authPage(c, title, body) {
   return html`${head(title, c.assetVersion)}
 <body class="auth"><main class="auth-card" id="main">
-  <div class="brand brand-center">${ICON}<span>Cutti</span></div>
+  <div class="brand brand-center">${ICON}<span>Gringa Ads</span></div>
   ${body}
 </main></body></html>`.s;
 }

@@ -300,7 +300,7 @@ export function normDate(raw) {
 /** Google Ads script the owner pastes in Tools > Scripts, scheduled hourly.
  * Sends cost per campaign, then uploads the sales Cutti hands back as offline conversions (no API token needed). */
 export function googleAdsScript(endpoint) {
-  return `// Cutti: manda o gasto por campanha (e por idade e sexo) e sobe as vendas para o Google Ads.
+  return `// Gringa Ads: manda o gasto por campanha (e por idade e sexo) e sobe as vendas para o Google Ads.
 // Cole em Ferramentas > Ações em massa > Scripts, autorize e programe "A cada hora".
 var ENDPOINT = ${JSON.stringify(endpoint)};
 
@@ -407,9 +407,9 @@ export const PRESELL_JS = `(function(){
 // ---------------------------------------------------------------- notification text
 
 export const TEMPLATE_DEFAULTS = {
-  sale_title: "Cutti informa 🤑🚀",
+  sale_title: "Gringa Ads informa 🤑🚀",
   sale_body: "Venda realizada na {rede}: {valor_curto}",
-  refund_title: "Cutti informa {emoji}",
+  refund_title: "Gringa Ads informa {emoji}",
   refund_body: "{tipo} na {rede}: {valor_curto}",
 };
 

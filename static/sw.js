@@ -4,9 +4,9 @@ self.addEventListener("install", function () { self.skipWaiting(); });
 self.addEventListener("activate", function (e) { e.waitUntil(self.clients.claim()); });
 self.addEventListener("push", function (e) {
   var d = {};
-  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: "Cutti", body: e.data ? e.data.text() : "" }; }
-  e.waitUntil(self.registration.showNotification(d.title || "Cutti", {
-    body: d.body || "", icon: "/static/logo-192.png", badge: "/static/logo-192.png",
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: "Gringa Ads", body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Gringa Ads", {
+    body: d.body || "", icon: "/static/ga-192.png", badge: "/static/ga-192.png",
     tag: d.tag || undefined, data: { url: d.url || "/sales" },
   }));
 });

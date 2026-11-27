@@ -74,9 +74,9 @@ test("cost CSV", () => {
 
 test("notification templates", () => {
   const v = { emoji: "💰", tipo: "Venda", valor: "US$ 10,00", rede: "ClickBank", origem: "Google Ads", campanha: "", anuncio: "A1", pedido: "", produto: "", pais: "" };
-  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_title, v), "Cutti informa 🤑🚀");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_title, v), "Gringa Ads informa 🤑🚀");
   assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.sale_body, { ...v, valor_curto: "10 USD" }), "Venda realizada na ClickBank: 10 USD");
-  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.refund_title, { ...v, emoji: "↩️" }), "Cutti informa ↩️");
+  assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.refund_title, { ...v, emoji: "↩️" }), "Gringa Ads informa ↩️");
   assert.equal(T.renderTemplate(T.TEMPLATE_DEFAULTS.refund_body, { ...v, tipo: "Reembolso", valor_curto: "10 USD" }), "Reembolso na ClickBank: 10 USD");
   assert.equal(T.renderTemplate("{produto} · {pais} · {rede}", { ...v, produto: "SodaPeak" }), "SodaPeak · ClickBank");
   assert.equal(T.renderTemplate("Caiu {valor} {desconhecida}", v), "Caiu US$ 10,00 {desconhecida}");

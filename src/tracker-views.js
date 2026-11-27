@@ -302,7 +302,7 @@ function audienceSection(audience, m) {
   };
   return html`<section class="card pad desktop-only" id="publico">
   <h2 class="h-md">Público do Google Ads: idade e sexo</h2>
-  ${any ? html`<p class="hint">Dados do próprio Google, no período escolhido. As conversões são as que o Google registrou, incluindo as vendas que o Cutti envia para ele.</p>
+  ${any ? html`<p class="hint">Dados do próprio Google, no período escolhido. As conversões são as que o Google registrou, incluindo as vendas que o Gringa Ads envia para ele.</p>
   <div class="aud-grid">${table("Idade", audience.age, AGE_LABEL)}${table("Sexo", audience.gender, GENDER_LABEL)}</div>`
     : html`<p class="muted">Ainda sem dados. Copie de novo o script em <a href="/tracking">Trackeamento</a> e cole no Google Ads por cima do antigo: a versão nova também manda idade e sexo.</p>`}
 </section>`;
@@ -344,7 +344,7 @@ export function platformsSetupView(c, { s, base, selected, added }) {
   return page({ ...c, section: "results" }, "Configurar plataformas", html`
 <nav class="crumbs"><a href="/platforms">‹ Plataformas</a></nav>
 <header class="page-head"><div><h1 class="h-xl">${added.length ? "Falta só o postback" : "Postbacks das plataformas"}</h1>
-  <p class="muted">Copie a URL de cada plataforma e cole no painel dela. É assim que a venda chega no Cutti.</p></div></header>
+  <p class="muted">Copie a URL de cada plataforma e cole no painel dela. É assim que a venda chega no Gringa Ads.</p></div></header>
 ${show.map((k) => html`<section class="card pad plat-setup">
   <h2 class="h-md">${netBrand(k, c.assetVersion)}</h2>
   <div class="copy-row"><input value="${pb(k)}" readonly aria-label="URL de postback ${NETWORKS[k].name}" spellcheck="false"><button class="btn btn-secondary btn-sm" type="button" data-copy="${pb(k)}">Copiar</button></div>
@@ -456,7 +456,7 @@ export function trackingView(c, { s, base, linkDomain, costCount, settingsError,
     <li><strong>Cole o script</strong>: Ferramentas → Ações em massa → <strong>Scripts</strong> → botão + → cole o código abaixo → <strong>Autorizar</strong> → Salvar → em Frequência, escolha <strong>A cada hora</strong>.</li>
     <li><strong>Use o link rastreado</strong> no modelo de rastreamento da conta ou da campanha (logo abaixo).</li>
   </ol>
-  ${copyBox("g-script", "Script do Cutti", googleAdsScript(`${base}/cost/${s.key}/google`), 10)}
+  ${copyBox("g-script", "Script do Gringa Ads", googleAdsScript(`${base}/cost/${s.key}/google`), 10)}
   <p class="hint">${s.gscript_at ? `Script rodou pela última vez em ${fmtDateTime(s.gscript_at)}.` : "O script ainda não rodou. Depois de colar, clique em Visualizar ou Executar para testar."} Se você já tinha colado o script antigo, troque pelo novo.</p>
   <form method="post" action="/integrations/tracking-settings" class="field-row" novalidate>
     ${csrfField(c)}<input type="hidden" name="back" value="/tracking">
@@ -580,10 +580,10 @@ function notifySection(c, s, tgError, devices) {
   <p class="muted">Cada venda (e, se quiser, cada reembolso) chega como notificação no celular, com valor, rede e campanha. Use um jeito só ou vários.</p>
   <div class="notify-grid">
     <div class="notify-box notify-main">
-      <h3 class="h-md">App Cutti ${devices.length ? html`<span class="badge badge-success">${devices.length} aparelho(s)</span>` : html`<span class="badge badge-accent">recomendado</span>`}</h3>
+      <h3 class="h-md">App Gringa Ads ${devices.length ? html`<span class="badge badge-success">${devices.length} aparelho(s)</span>` : html`<span class="badge badge-accent">recomendado</span>`}</h3>
       <p class="hint">O próprio painel vira um app no celular, com ícone na tela de início e notificação de venda. Grátis, sem loja de apps.</p>
       <ol class="steps">
-        <li><strong>iPhone:</strong> abra <code>app.cutti.us</code> no Safari, toque em Compartilhar → <strong>Adicionar à Tela de Início</strong>, e abra o Cutti pelo ícone novo.</li>
+        <li><strong>iPhone:</strong> abra <code>app.cutti.us</code> no Safari, toque em Compartilhar → <strong>Adicionar à Tela de Início</strong>, e abra o Gringa Ads pelo ícone novo.</li>
         <li><strong>Android:</strong> abra no Chrome e toque em <strong>Instalar app</strong> (ou menu ⋮ → Adicionar à tela inicial).</li>
         <li>Dentro do app, venha até aqui e toque no botão abaixo. Permita as notificações.</li>
       </ol>
@@ -634,7 +634,7 @@ function templateEditor(c, s) {
   const field = (k, label) => html`<div class="field"><label for="tpl-${k}">${label}</label>
     <input id="tpl-${k}" name="${k}" maxlength="200" value="${t[k]}" data-tpl="${k}" spellcheck="false"></div>`;
   const preview = (kind) => html`<div class="push-preview" data-preview="${kind}">
-    <img src="/static/logo-192.png" alt="" width="36" height="36">
+    <img src="/static/ga-192.png" alt="" width="36" height="36">
     <div><strong data-preview-title>${renderTemplate(t[`${kind}_title`], kind === "sale" ? SAMPLE_VARS : { ...SAMPLE_VARS, emoji: "↩️", tipo: "Reembolso" })}</strong>
     <span data-preview-body>${renderTemplate(t[`${kind}_body`], kind === "sale" ? SAMPLE_VARS : { ...SAMPLE_VARS, emoji: "↩️", tipo: "Reembolso" })}</span></div>
   </div>`;

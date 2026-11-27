@@ -67,12 +67,12 @@ function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
     <span class="set-label">Testar aviso<span class="hint">Manda uma venda de exemplo para os seus aparelhos</span></span>
     <button class="btn btn-primary btn-sm btn-icon" type="submit">${raw('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>')}Testar</button></form>
 </div>
-<p class="set-note">No iPhone, abra o Cutti pelo ícone da Tela de Início antes de ativar.</p>
+<p class="set-note">No iPhone, abra o Gringa Ads pelo ícone da Tela de Início antes de ativar.</p>
 
 <h2 class="set-title mobile-only">Mais</h2>
 <div class="set-group mobile-only">
   <a class="set-row" href="/tracking"><span class="set-label">Trackeamento<span class="hint">Postbacks, Google Ads, NewsBreak · melhor no computador</span></span>${chev}</a>
-  <a class="set-row" href="/integrations"><span class="set-label">Avisos e moeda<span class="hint">App Cutti, Telegram, texto do aviso, câmbio</span></span>${chev}</a>
+  <a class="set-row" href="/integrations"><span class="set-label">Avisos e moeda<span class="hint">App Gringa Ads, Telegram, texto do aviso, câmbio</span></span>${chev}</a>
   <a class="set-row" href="/domains"><span class="set-label">Domínios</span>${chev}</a>
   <form method="post" action="/logout" class="set-row">${csrfField(c)}<button class="set-link danger-text" type="submit">Sair</button></form>
 </div>`);

@@ -683,7 +683,7 @@ async function handle(req, env, exec) {
   // Machine endpoints: the secret key in the path is the credential, so no session or CSRF.
   if (path === "/t.js") return TR.presellScript();
   if (path === "/apple-touch-icon.png" || path === "/apple-touch-icon-precomposed.png") {
-    const a = ASSETS["logo-apple-180.png"];
+    const a = ASSETS["ga-apple-180.png"];
     return new Response(Uint8Array.from(atob(a.body), (ch) => ch.charCodeAt(0)), { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" } });
   }
   if (path === "/sw.js") {
