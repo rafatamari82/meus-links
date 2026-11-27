@@ -63,8 +63,8 @@ function settingsView(c, { s, nets, devices, email, emailReady, emailTo }) {
 </div>
 <p class="set-note">No iPhone, abra o Cutti pelo ícone da Tela de Início antes de ativar.</p>
 
-<h2 class="set-title">Mais</h2>
-<div class="set-group">
+<h2 class="set-title mobile-only">Mais</h2>
+<div class="set-group mobile-only">
   <a class="set-row" href="/tracking"><span class="set-label">Trackeamento<span class="hint">Postbacks, Google Ads, NewsBreak · melhor no computador</span></span>${chev}</a>
   <a class="set-row" href="/integrations"><span class="set-label">Avisos e moeda<span class="hint">App Cutti, Telegram, texto do aviso, câmbio</span></span>${chev}</a>
   <a class="set-row" href="/domains"><span class="set-label">Domínios</span>${chev}</a>

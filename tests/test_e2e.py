@@ -494,6 +494,11 @@ class E2E(unittest.TestCase):
         p = self.page
         p.goto(self.base + "/integrations")
         expect(p.get_by_text("App ntfy")).to_have_count(0)
+        expect(p.locator("main").get_by_role("link", name="Trackeamento")).to_have_count(0)
+        p.goto(self.base + "/settings")  # on a computer the sidebar has these, so Ajustes does not repeat them
+        expect(p.get_by_role("heading", name="Mais")).to_be_hidden()
+        expect(p.locator("main").get_by_role("link", name=re.compile("^Trackeamento"))).to_be_hidden()
+        p.goto(self.base + "/integrations")
         p.get_by_label("Token do bot").fill("isso-nao-e-token")
         p.get_by_role("button", name="Conectar").click()
         expect(p.locator("#tg-err")).to_contain_text("BotFather")

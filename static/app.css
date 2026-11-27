@@ -144,6 +144,9 @@ body.auth { display: grid; place-items: center; min-height: 100vh; padding: var(
 .auth-card .h-lg { margin-bottom: var(--space-2); }
 .center { text-align: center; }
 
+/* only on phones: on a computer the sidebar already has these */
+@media (min-width: 761px) { .mobile-only { display: none !important; } }
+
 /* mobile */
 @media (max-width: 760px) {
   .shell { grid-template-columns: 1fr; }

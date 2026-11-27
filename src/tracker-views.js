@@ -360,8 +360,7 @@ ${google ? html`<details class="card pad adv-box" ${gErrors ? raw("open") : ""}>
 export function integrationsView(c, { s, settingsError, tgError, devices = [] }) {
   const curOpt = (v, sel) => html`<option ${v === sel ? raw("selected") : ""}>${v}</option>`;
   return page({ ...c, section: "integrations" }, "Avisos e moeda", html`
-<header class="page-head"><div><h1 class="h-xl">Avisos e moeda</h1><p class="muted">Notificações de venda e câmbio.</p></div>
-  <a class="btn btn-secondary btn-sm" href="/tracking">Trackeamento</a></header>
+<header class="page-head"><div><h1 class="h-xl">Avisos e moeda</h1><p class="muted">Notificações de venda e câmbio.</p></div></header>
 
 ${notifySection(c, s, tgError, devices)}
 
