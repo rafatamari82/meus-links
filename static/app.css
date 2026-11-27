@@ -401,3 +401,17 @@ a.set-row:hover { background: var(--color-surface); }
   .dash-filters { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) { .main > .dash-head + * { margin-top: 0; } }
+
+/* Phone Resumo: a bit smaller cards, platform cards below */
+@media (max-width: 760px) {
+  .m-kpi { border-radius: 16px; padding: var(--space-3) var(--space-4) var(--space-4); }
+  .m-kpi-label { font-size: var(--text-sm); }
+  .m-kpi-value { font-size: 28px; margin-top: var(--space-1); }
+  .m-kpi-hero .m-kpi-value { font-size: 32px; }
+  .net-cards { grid-template-columns: 1fr; gap: var(--space-3); }
+  .net-card { border-radius: 16px; padding: var(--space-3) var(--space-8) var(--space-3) var(--space-4); }
+  .net-name { color: var(--color-text); font-size: var(--text-sm); }
+  .net-value { font-size: 22px; margin-top: 2px; color: var(--color-text); }
+  .net-sub { font-size: var(--text-sm); }
+  .net-chev { color: var(--color-text); }
+}

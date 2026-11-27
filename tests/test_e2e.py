@@ -587,6 +587,10 @@ class E2E(unittest.TestCase):
         expect(kpis.locator(".m-kpi-hero")).to_contain_text("Faturamento")
         expect(kpis.locator(".m-kpi-dark")).to_contain_text("Vendas")
         expect(kpis.locator(".m-kpi-outline")).to_contain_text("Reembolsos")
+        cards = m.locator(".net-cards.mobile-only .net-card")
+        if cards.count():
+            expect(cards.first).to_be_visible()
+            self.assertIn("/sales?", cards.first.get_attribute("href"))
         # phone shows the short version: only the period filter, no full dashboard
         expect(m.locator("#p")).to_be_visible()
         expect(m.get_by_label("Plataforma")).to_be_hidden()

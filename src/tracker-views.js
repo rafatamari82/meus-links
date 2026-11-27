@@ -112,6 +112,13 @@ ${empty}
   <div class="m-kpi m-kpi-dark"><p class="m-kpi-label">Vendas</p><p class="m-kpi-value">${tot.sales}</p></div>
   <div class="m-kpi m-kpi-outline"><p class="m-kpi-label">Reembolsos</p><p class="m-kpi-value">${tot.refunds}</p></div>
 </div>
+${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) => html`
+  <a class="net-card" href="/sales?${new URLSearchParams({ ...base, network: n.network })}">
+    <span class="net-name"><span class="net-mark" aria-hidden="true">${(NETWORKS[n.network]?.name || n.network).slice(0, 1).toUpperCase()}</span>${NETWORKS[n.network]?.name || n.network}</span>
+    <span class="net-value">${m(n.revenue)}</span>
+    <span class="net-sub">${n.sales} ${n.sales === 1 ? "venda" : "vendas"} · ${n.refunds} reembolso(s)</span>
+    <svg class="net-chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+  </a>`)}</div>` : ""}
 
 <div class="mgrid mgrid-main desktop-only">
   <div class="mcard mcard-hero"><p class="mcard-label">Faturamento líquido</p><p class="mcard-value">${m(tot.revenue)}</p><p class="mcard-sub">${tot.sales} ${tot.sales === 1 ? "venda" : "vendas"}${tot.refunds ? ` · ${tot.refunds} reembolso(s)` : ""}</p></div>
