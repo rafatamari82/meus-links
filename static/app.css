@@ -580,3 +580,10 @@ a.set-row:hover { background: var(--color-surface); }
 
 /* Gringa Ads: the flame red marks the current tab */
 .tab-item.is-current { color: #e3141b; }
+
+/* Dashboard on the phone: full "Gringa Ads" logo in the top bar instead of the square icon */
+.brand-wordmark { display: none; }
+@media (max-width: 760px) {
+  .brand-wordmark { display: block; height: 30px; width: auto; }
+  .brand:has(.brand-wordmark) .brand-logo { display: none; }
+}
