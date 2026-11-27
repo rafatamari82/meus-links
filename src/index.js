@@ -211,9 +211,10 @@ async function serveShort(c, slashtag) {
     } catch { /* no referrer */ }
     const ts = now();
     const { device, os } = core.parseDevice(ua);
-    // Where robots come from (IP, place, network) is kept for robots only; people's IPs are never stored.
+    // Where a visit came from (IP, city, network) is kept only for robots, VPNs and visits stopped by the
+    // country rule; the IP of people who get through is never stored.
     const cf = c.req.cf || {};
-    const rob = bot || blockVpn ? {
+    const rob = bot || blockVpn || !allowed ? {
       ip: (c.req.headers.get("CF-Connecting-IP") || "").slice(0, 64) || null,
       city: (cf.city || c.req.headers.get("X-Test-City") || "").slice(0, 80) || null,
       region: (cf.region || "").slice(0, 80) || null,
@@ -510,7 +511,7 @@ async function linkStats(c, id) {
   const blocked = (await c.db.prepare("select count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 1").bind(id).first()).n;
   // People stopped by the country rule: when, from where, on what (no IP: these are people).
   const blockedList = (await c.db.prepare(
-    "select at, country, device, os from clicks where link_id = ? and is_bot = 0 and blocked = 1 order by id desc limit 50",
+    "select at, ip, city, region, country, as_org, device, os from clicks where link_id = ? and is_bot = 0 and blocked = 1 order by id desc limit 50",
   ).bind(id).all()).results;
   const breakdown = async (col) => (await c.db.prepare(
     `select coalesce(${col}, '') as k, count(*) as n from clicks where link_id = ? and is_bot = 0 and blocked = 0 group by k order by n desc limit 10`,

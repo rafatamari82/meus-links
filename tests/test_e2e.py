@@ -415,6 +415,7 @@ class E2E(unittest.TestCase):
         box = self.page.locator("section.robots", has_text="Acessos bloqueados por país")
         expect(box.locator("tbody tr")).to_have_count(1)
         expect(box.locator("tbody tr")).to_contain_text("Brasil")
+        expect(box.locator("td[data-label=IP]")).to_have_text(re.compile(r"127\.0\.0\.1|::1"))
 
     def test_f06_allow_only(self):
         self.create("https://exemplo.com/geo2", "geolib")

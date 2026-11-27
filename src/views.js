@@ -419,16 +419,19 @@ export function statsView(c, { link, days, peak, refs, bots, blocked = 0, blocke
 ${blockedList.length ? html`<section class="card table-wrap robots">
   <h2 class="h-md pad-x">Acessos bloqueados por país</h2>
   <p class="hint pad-x">Quem abriu o link de um país bloqueado e viu a página “Oi Curioso!”. Não conta como clique.</p>
-  <table class="simple"><thead><tr><th scope="col">Quando</th><th scope="col">País</th><th scope="col">Aparelho</th></tr></thead>
+  <table class="simple"><thead><tr><th scope="col">Quando</th><th scope="col">IP</th><th scope="col">Local</th><th scope="col">Internet</th><th scope="col">Aparelho</th></tr></thead>
   <tbody>${blockedList.map((r) => html`<tr>
     <td data-label="Quando">${fmtDateTime(r.at)}</td>
-    <td data-label="País">${r.country ? countryName(r.country) : "Desconhecido"}</td>
+    <td data-label="IP" class="mono">${r.ip || "—"}</td>
+    <td data-label="Local">${[r.city, r.region, r.country ? countryName(r.country) : "País desconhecido"].filter(Boolean).join(", ")}</td>
+    <td data-label="Internet">${r.as_org || "—"}</td>
     <td data-label="Aparelho">${[r.device, r.os].filter(Boolean).join(" · ") || "—"}</td>
   </tr>`)}</tbody></table>
+  <p class="hint pad-x">A cidade vem da localização aproximada do IP e pode errar por algumas dezenas de km. Os acessos de antes desta mudança aparecem sem IP e cidade.</p>
 </section>` : ""}
 ${robots.length ? html`<section class="card table-wrap robots">
   <h2 class="h-md pad-x">Acessos de robôs e VPN</h2>
-  <p class="hint pad-x">Os últimos ${robots.length}. O IP e o local são guardados só de robôs e VPNs barradas, nunca das pessoas.</p>
+  <p class="hint pad-x">Os últimos ${robots.length}. O IP e o local são guardados só de robôs, VPNs e acessos bloqueados; de quem passa, nunca.</p>
   <table class="simple robot-table"><thead><tr><th scope="col">Quando</th><th scope="col">IP</th><th scope="col">Local</th><th scope="col">Rede</th><th scope="col">Situação</th><th scope="col">Navegador</th></tr></thead>
   <tbody>${robots.map((r) => html`<tr>
     <td data-label="Quando">${fmtDateTime(r.at)}</td>
