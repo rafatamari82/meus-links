@@ -328,7 +328,7 @@ export async function notify(db, s, m, fetcher = fetch, { email = null, panel = 
     }).then((r) => (r.ok ? null : `Telegram respondeu ${r.status}`)));
   }
   const out = await Promise.all(jobs.map((j) => j.catch((e) => `falha de conexão (${e?.name || "erro"})`)));
-  return { sent: jobs.length, errors: out.filter(Boolean) };
+  return { sent: jobs.length, errors: out.filter(Boolean), phones: subs.length, email: !!(s.email_on && email), telegram: !!(s.tg_token && s.tg_chat) };
 }
 
 // E-mail through Cloudflare Email Routing (free to a verified address). EMAIL_FROM must be on the panel's domain.
@@ -826,9 +826,11 @@ export async function integrationsPost(c, action) {
   } else if (action === "notify-test") {
     const s = await getSettings(c.db);
     const r = await notify(c.db, s, { ...messageFrom(s, T.SAMPLE_VARS, false), vars: T.SAMPLE_VARS }, c.env.__notifyFetch || fetch, { email: c.env.EMAIL, emailTo: c.env.EMAIL_TO, panel: `https://${c.panelHost()}` });
+    const where = [r.phones ? `${r.phones} celular(es)` : "", r.email ? "e-mail" : "", r.telegram ? "Telegram" : ""].filter(Boolean).join(", ");
     if (!r.sent) c.flash("error", "Nenhum aviso configurado ainda.");
-    else if (r.errors.length) c.flash("error", `Não foi: ${r.errors.join("; ")}`);
-    else c.flash("success", "Aviso de teste enviado. Olhe o celular.");
+    else if (r.errors.length) c.flash("error", `Não foi: ${r.errors.join("; ")}${r.errors.some((e) => /removido/.test(e)) ? ". Abra o Cutti pelo ícone e toque em Ativar de novo." : ""}`);
+    else if (!r.phones) c.flash("error", `Enviado só para: ${where}. Nenhum celular está com aviso ativado: abra o Cutti pelo ícone da tela de início, vá em Ajustes e toque em Ativar.`);
+    else c.flash("success", `Aviso de teste enviado para: ${where}. Olhe o celular.`);
   } else if (action === "templates") {
     if (f.get("reset")) {
       for (const k of Object.keys(T.TEMPLATE_DEFAULTS)) await setSetting(c.db, `tpl_${k}`, "");
