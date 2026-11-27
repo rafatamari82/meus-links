@@ -46,15 +46,10 @@ const GOAL_LEVELS = [
   { at: 100_000_00, name: "Diamante", tone: "diamond" },
 ];
 const GOAL = 100_000_00;
-function medal(tone) {
-  return raw(`<svg class="medal medal-${tone}" viewBox="0 0 64 64" aria-hidden="true">
-  <path class="m-ring" d="M32 3 57 17.5v29L32 61 7 46.5v-29z"/>
-  <path class="m-face" d="M32 9 52 20.5v23L32 55 12 43.5v-23z"/>
-  <path class="m-star" d="m32 17 4.1 8.6 9.4 1.2-6.9 6.5 1.8 9.3L32 38.1l-8.4 4.5 1.8-9.3-6.9-6.5 9.4-1.2z"/>
-  <path class="m-wing" d="M22 47.5 32 42l10 5.5-3 2.6-7-3.8-7 3.8z"/>
-</svg>`);
-}
-function goalCard(cents) {
+// Level badges sent by the owner (static/badge-*.png); Diamante uses the gold one, which has the crown.
+const BADGE = { start: "beginner", bronze: "bronze", silver: "silver", gold: "gold", diamond: "gold" };
+const medal = (tone, name, v) => html`<img class="medal" src="/static/badge-${BADGE[tone]}.png?v=${v}" alt="Selo ${name}">`;
+function goalCard(cents, v0) {
   const v = Math.max(0, Math.round(cents));
   const level = [...GOAL_LEVELS].reverse().find((l) => v >= l.at);
   const next = GOAL_LEVELS.find((l) => l.at > v);
@@ -62,7 +57,7 @@ function goalCard(cents) {
   const brl = (x) => fmtMoney(x, "BRL").replace(/,\d{2}$/, "");
   const done = v >= GOAL;
   return html`<section class="card goal">
-  ${medal(level.tone)}
+  ${medal(level.tone, level.name, v0)}
   <div class="goal-main">
     <div class="goal-top"><strong class="goal-level">${level.name}</strong>
       <span class="goal-next">${done ? "Meta de R$ 100 mil batida!" : `Rumo ao nível ${next.name}`}</span></div>
@@ -205,7 +200,7 @@ ${empty}
   <div class="m-kpi m-kpi-dark"><p class="m-kpi-label">Vendas</p><p class="m-kpi-value">${tot.sales}</p></div>
   <div class="m-kpi m-kpi-outline"><p class="m-kpi-label">Reembolsos</p><p class="m-kpi-value">${tot.refunds}</p></div>
 </div>
-${goalCard(lifetimeBrl)}
+${goalCard(lifetimeBrl, c.assetVersion)}
 ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) => html`
   <a class="net-card" href="/sales?${new URLSearchParams({ ...base, network: n.network })}">
     <span class="net-name">${netBrand(n.network, c.assetVersion)}</span>
