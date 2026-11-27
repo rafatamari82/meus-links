@@ -222,6 +222,11 @@ class E2E(unittest.TestCase):
         r = hit(60068)
         self.assertNotEqual(r.status, 302)
         self.assertIn("Aqui não", r.text())
+        m = self.browser.new_page(viewport={"width": 390, "height": 760})
+        m.set_content(r.text().replace('href="/static', f'href="{self.base}/static').replace('src="/static', f'src="{self.base}/static'))
+        m.wait_for_timeout(400)
+        m.screenshot(path="/tmp/blocked.png")
+        m.close()
         self.assertEqual(hit(28573).status, 302)   # home internet (Claro) passes
         self.assertEqual(hit(15169).status, 302)   # Google's network is never blocked
         self.assertEqual(self.clicks_for("vpncheck"), 3)
@@ -400,7 +405,8 @@ class E2E(unittest.TestCase):
         expect(self.page.locator("tbody")).to_contain_text("Bloqueado em Brasil, Estados Unidos")
         status, body = self.geo_hit("geobloq", "BR")
         self.assertEqual(status, 403)
-        self.assertIn("Oi, curioso! Aqui não.", body)
+        self.assertIn('alt="Oi, curioso!"', body)
+        self.assertIn("Aqui não.", body)
         self.assertEqual(self.geo_hit("geobloq", "PT")[0], 302)
         self.assertEqual(self.geo_hit("geobloq", None)[0], 302)  # unknown country passes
         self.assertEqual(self.clicks_for("geobloq"), 2)  # the blocked visit is not counted

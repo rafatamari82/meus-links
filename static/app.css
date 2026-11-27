@@ -608,3 +608,14 @@ a.set-row:hover { background: var(--color-surface); }
 
 .vpn-check { display: flex; gap: var(--space-2); align-items: flex-start; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border); }
 .vpn-check .hint { display: block; }
+
+/* Blocked page (country / VPN): yellow, "Oi, curioso!" banner, binoculars */
+body.geo-blocked { margin: 0; min-height: 100vh; background: #fdee04; display: grid; place-items: center; }
+.geo-main { text-align: center; padding: 24px; width: min(720px, 100%); }
+.geo-main h1 { margin: 0; }
+.geo-banner { display: block; width: 100%; height: auto; }
+.geo-bino { width: 150px; height: auto; margin: 28px auto 8px; display: block; }
+.geo-bino rect, .geo-bino circle { fill: #1b1b1b; }
+.geo-bino .lens { fill: #9fd3ea; }
+.geo-bino .shine { fill: #fff; }
+.geo-text { margin: 0; font-size: 34px; font-weight: 800; color: #1b1b1b; letter-spacing: -0.01em; }
