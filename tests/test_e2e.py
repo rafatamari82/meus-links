@@ -840,7 +840,7 @@ class E2E(unittest.TestCase):
         expect(goal).to_contain_text("/ R$ 100.000")
         expect(goal).to_contain_text("restantes")
         expect(goal.get_by_role("progressbar", name="Meta de faturamento")).to_be_visible()
-        expect(goal.get_by_role("img", name="Selo Iniciante")).to_be_visible()
+        expect(goal.get_by_role("img", name="Selo Beginner")).to_be_visible()
         goal.screenshot(path="/tmp/goal-desk.png")
         perf.get_by_label("Métricas").select_option(label="Faturamento e gasto")
         p.wait_for_url(re.compile(r"chart=rc"))

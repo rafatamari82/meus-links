@@ -39,15 +39,15 @@ function stat(label, value, tone = "") {
 // "Desempenho": running totals of this period (lines) against the period before (soft areas), two axes.
 // Goal: lifetime revenue in reais up to R$ 100 mil, with levels and a medal drawn for Cutti.
 const GOAL_LEVELS = [
-  { at: 0, name: "Iniciante", tone: "start" },
+  { at: 0, name: "Beginner", tone: "start" },
   { at: 10_000_00, name: "Bronze", tone: "bronze" },
-  { at: 25_000_00, name: "Prata", tone: "silver" },
-  { at: 50_000_00, name: "Ouro", tone: "gold" },
-  { at: 100_000_00, name: "Diamante", tone: "diamond" },
+  { at: 25_000_00, name: "Silver", tone: "silver" },
+  { at: 50_000_00, name: "Gold", tone: "gold" },
+  { at: 100_000_00, name: "Diamond", tone: "diamond" },
 ];
 const GOAL = 100_000_00;
-// Level badges sent by the owner (static/badge-*.png); Diamante uses the gold one, which has the crown.
-const BADGE = { start: "beginner", bronze: "bronze", silver: "silver", gold: "gold", diamond: "gold" };
+// Level badges sent by the owner (static/badge-*.png).
+const BADGE = { start: "beginner", bronze: "bronze", silver: "silver", gold: "gold", diamond: "diamond" };
 const medal = (tone, name, v) => html`<img class="medal" src="/static/badge-${BADGE[tone]}.png?v=${v}" alt="Selo ${name}">`;
 function goalCard(cents, v0) {
   const v = Math.max(0, Math.round(cents));
