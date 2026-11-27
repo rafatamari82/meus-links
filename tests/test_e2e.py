@@ -835,6 +835,8 @@ class E2E(unittest.TestCase):
         expect(perf.locator(".perf-foot")).to_contain_text("Faturamento:")
         expect(perf.locator(".perf-foot")).to_contain_text("Vendas:")
         perf.screenshot(path="/tmp/perf-month.png")
+        expect(p.locator(".sidebar").get_by_role("img", name="Gringa Ads")).to_be_visible()
+        p.locator(".sidebar").screenshot(path="/tmp/sidebar.png")
         goal = p.locator("section.goal")
         expect(goal).to_be_visible()
         expect(goal).to_contain_text("/ R$ 100.000")

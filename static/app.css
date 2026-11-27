@@ -587,3 +587,15 @@ a.set-row:hover { background: var(--color-surface); }
   .brand-wordmark { display: block; height: 30px; width: auto; }
   .brand:has(.brand-wordmark) .brand-logo { display: none; }
 }
+
+/* Full logo: in the computer's sidebar on every page; on the phone only on the Dashboard */
+@media (min-width: 761px) {
+  .sidebar .brand-wordmark { display: block; height: 34px; width: auto; }
+  .sidebar .brand .brand-logo, .sidebar .brand .brand-name { display: none; }
+}
+@media (max-width: 760px) {
+  .brand-wordmark { display: none; }
+  .brand-dash .brand-wordmark { display: block; height: 30px; width: auto; }
+  .brand-dash .brand-logo { display: none; }
+}
+@media (min-width: 761px) { .sidebar .brand-wordmark { height: 40px; } }
