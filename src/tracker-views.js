@@ -245,7 +245,6 @@ export function platformsView(c, { selected }) {
       <span class="plat-name">${netBrand(k, c.assetVersion)}</span>
       <span class="plat-check" aria-hidden="true">✓</span>
     </label>`)}</div>
-  <p class="hint">Usa outra plataforma, como Braip, Monetizze ou Perfect Pay? Mande o postback dela que ela entra nesta lista.</p>
   <div class="plat-bar"><button class="btn btn-primary btn-block plat-next" type="submit">Avançar</button></div>
 </form>`);
 }
