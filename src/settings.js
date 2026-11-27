@@ -59,7 +59,11 @@ function settingsView(c, { s, nets, devices, ipBlocks = [], email, emailReady, e
     <input type="hidden" name="ip" value="${b.ip}"><input type="hidden" name="action" value="unblock"><input type="hidden" name="back" value="/settings">
     <span class="set-label"><span class="mono">${b.ip}</span><span class="hint">Bloqueado em ${fmtDateTime(b.created_at)}</span></span>
     <button class="btn btn-secondary btn-sm" type="submit">Desbloquear</button></form>`)
-    : html`<div class="set-row"><span class="set-label">Nenhum IP bloqueado<span class="hint">Bloqueie pelo botão “Bloquear IP” nas estatísticas de um link.</span></span></div>`}
+    : html`<div class="set-row"><span class="set-label">Nenhum IP bloqueado<span class="hint">Bloqueie pelo botão “Bloquear IP” nas estatísticas de um link, ou digite abaixo.</span></span></div>`}
+  <form method="post" action="/ip-blocks" class="set-row ip-add">${csrfField(c)}<input type="hidden" name="back" value="/settings">
+    <label class="sr-only" for="ip-new">IP para bloquear</label>
+    <input id="ip-new" name="ip" placeholder="Ex.: 189.45.12.7" inputmode="decimal" autocomplete="off" spellcheck="false" required>
+    <button class="btn btn-primary btn-sm" type="submit">Bloquear</button></form>
 </div>
 
 <h2 class="set-title">Notificações de venda</h2>

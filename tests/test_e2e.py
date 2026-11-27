@@ -432,6 +432,11 @@ class E2E(unittest.TestCase):
         self.page.locator("form[action='/ip-blocks']").get_by_role("button", name="Desbloquear").click()
         expect(self.page.get_by_text(re.compile(r"desbloqueado"))).to_be_visible()
         expect(self.page.get_by_text("Nenhum IP bloqueado")).to_be_visible()
+        self.page.get_by_label("IP para bloquear").fill("203.0.113.9")
+        self.page.locator("form.ip-add").get_by_role("button", name="Bloquear").click()
+        expect(self.page.get_by_text("IP 203.0.113.9 bloqueado em todos os seus links.")).to_be_visible()
+        self.page.locator("form[action='/ip-blocks']", has_text="203.0.113.9").get_by_role("button", name="Desbloquear").click()
+        expect(self.page.get_by_text("Nenhum IP bloqueado")).to_be_visible()
         self.assertEqual(self.geo_hit("geobloq", "PT")[0], 302)
 
     def test_f06_allow_only(self):

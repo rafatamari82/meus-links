@@ -505,7 +505,7 @@ export function domainsView(c, { domains, counts, error, value, panelHost }) {
 
 // "Bloquear este IP" / "Desbloquear" button for a row of the access tables.
 function ipButton(c, ip, blocks, linkId) {
-  if (!ip || ip === "local") return "";
+  if (!ip || ip === "local") return html`<span class="hint" title="Acesso de antes de o IP ser guardado">sem IP</span>`;
   const on = blocks.has(ip);
   return html`<form method="post" action="/ip-blocks" ${on ? "" : raw('data-confirm="Bloquear este IP em todos os seus links? Em internet de celular, o mesmo IP pode ser de várias pessoas."')}>
     ${csrfField(c)}<input type="hidden" name="ip" value="${ip}"><input type="hidden" name="back" value="/links/${linkId}">
