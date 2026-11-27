@@ -12,7 +12,7 @@ const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(1).replace(".", ",")}%` : 
 const ratio = (x) => (x == null ? "—" : `${x.toFixed(2).replace(".", ",")}x`);
 const ddmm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const hhmm = (iso) => new Date(Date.parse(iso) - 3 * 36e5).toISOString().slice(11, 16);
-const RANGE_LABEL = { today: "Hoje", yesterday: "Ontem", "7d": "Últimos 7 dias", "30d": "Últimos 30 dias", month: "Este mês" };
+const RANGE_LABEL = { today: "Hoje", yesterday: "Ontem", "7d": "Últimos 7 dias", "30d": "Últimos 30 dias", month: "Este mês", all: "Tudo" };
 
 function rangeForm(range, extra = {}) {
   const opt = (v, l) => html`<option value="${v}" ${range.preset === v ? raw("selected") : ""}>${l}</option>`;
@@ -21,7 +21,7 @@ function rangeForm(range, extra = {}) {
   ${Object.entries(extra).map(([k, v]) => (v ? html`<input type="hidden" name="${k}" value="${v}">` : ""))}
   <label class="sr-only" for="p">Período</label>
   <select id="p" name="p" data-range-preset>
-    ${opt("today", "Hoje")}${opt("yesterday", "Ontem")}${opt("7d", "Últimos 7 dias")}${opt("30d", "Últimos 30 dias")}${opt("month", "Este mês")}${opt("custom", "Escolher datas")}
+    ${opt("today", "Hoje")}${opt("yesterday", "Ontem")}${opt("7d", "Últimos 7 dias")}${opt("30d", "Últimos 30 dias")}${opt("month", "Este mês")}${opt("all", "Tudo")}${opt("custom", "Escolher datas")}
   </select>
   <span class="range-custom" ${range.preset === "custom" ? "" : raw("hidden")}>
     <label class="sr-only" for="from">De</label><input id="from" name="from" type="date" value="${range.from}">
@@ -91,7 +91,7 @@ ${empty}
   ${byAd ? html`<input type="hidden" name="by" value="ad">` : ""}
   <div class="field"><label for="p">Período</label>
     <select id="p" name="p" data-range-preset data-autosubmit-select>
-      ${opt("today", "Hoje", range.preset)}${opt("yesterday", "Ontem", range.preset)}${opt("7d", "Últimos 7 dias", range.preset)}${opt("30d", "Últimos 30 dias", range.preset)}${opt("month", "Este mês", range.preset)}${opt("custom", "Escolher datas", range.preset)}
+      ${opt("today", "Hoje", range.preset)}${opt("yesterday", "Ontem", range.preset)}${opt("7d", "Últimos 7 dias", range.preset)}${opt("30d", "Últimos 30 dias", range.preset)}${opt("month", "Este mês", range.preset)}${opt("all", "Tudo", range.preset)}${opt("custom", "Escolher datas", range.preset)}
     </select>
     <span class="range-custom" ${range.preset === "custom" ? "" : raw("hidden")}>
       <label class="sr-only" for="from">De</label><input id="from" name="from" type="date" value="${range.from}">

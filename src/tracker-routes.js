@@ -534,12 +534,13 @@ export function readRange(params) {
   else if (preset === "yesterday") { from = addDays(today, -1); to = from; }
   else if (preset === "30d") from = addDays(today, -29);
   else if (preset === "month") from = `${today.slice(0, 8)}01`;
+  else if (preset === "all") from = "2000-01-01";
   else if (preset === "custom") {
     from = T.normDate(params.get("from")) || addDays(today, -6);
     to = T.normDate(params.get("to")) || today;
     if (to < from) [from, to] = [to, from];
   } else from = addDays(today, -6);
-  return { preset: ["today", "yesterday", "7d", "30d", "month", "custom"].includes(preset) ? preset : "7d", from, to, start: utcStart(from), end: utcStart(addDays(to, 1)) };
+  return { preset: ["today", "yesterday", "7d", "30d", "month", "all", "custom"].includes(preset) ? preset : "7d", from, to, start: utcStart(from), end: utcStart(addDays(to, 1)) };
 }
 
 // ---------------------------------------------------------------- panel pages
@@ -658,7 +659,9 @@ export async function resultsPage(c) {
 
   // per day, for the chart
   const days = [];
-  for (let d = range.from; d <= range.to && days.length < 92; d = addDays(d, 1)) days.push(d);
+  // The chart shows at most the last 92 days of the period (all of it for short periods).
+  const chartFrom = range.from > addDays(range.to, -91) ? range.from : addDays(range.to, -91);
+  for (let d = chartFrom; d <= range.to; d = addDays(d, 1)) days.push(d);
   const dayRev = Object.fromEntries(days.map((d) => [d, 0]));
   const dayCost = Object.fromEntries(days.map((d) => [d, 0]));
   for (const r of dRows) if (r.d in dayRev) dayRev[r.d] += sumRev(r.type, conv(r.cents, r.currency));
