@@ -319,13 +319,19 @@ export async function notify(db, s, m, fetcher = fetch, { email = null, panel = 
     for (const sub of subs) {
       jobs.push(sendPush(sub, { title: m.title, body: m.body, url: "/sales" }, s.vapid, subject, fetcher).then(async (st) => {
         if (st === 404 || st === 410) {
-          await db.prepare("delete from push_subs where id = ?").bind(sub.id).run();
+          await db.batch([
+            db.prepare("delete from push_subs where id = ?").bind(sub.id),
+            db.prepare("insert into tk_events (at, network, outcome, detail) values (?, 'aviso', 'aparelho removido', ?)")
+              .bind(nowIso(), `${sub.label || "aparelho"}: a Apple/Google respondeu ${st} (inscrição trocada ou desativada). Abra o app pelo ícone para reativar.`),
+          ]);
           return `${sub.label || "aparelho"} saiu (removido)`;
         }
         if (st >= 200 && st < 300) {
           await db.prepare("update push_subs set last_ok_at = ? where id = ?").bind(nowIso(), sub.id).run();
           return null;
         }
+        await db.prepare("insert into tk_events (at, network, outcome, detail) values (?, 'aviso', 'falha no aviso', ?)")
+          .bind(nowIso(), `${sub.label || "aparelho"} respondeu ${st}`).run();
         return `${sub.label || "aparelho"} respondeu ${st}`;
       }));
     }
@@ -937,4 +943,37 @@ export async function platformsSetupPage(c) {
   const selected = await currentPlatforms(c, s);
   const added = String(c.url.searchParams.get("new") || "").split(",").filter((n) => selected.includes(n));
   return c.respond(TV.platformsSetupView(c.view(), { s, base: `https://${c.panelHost()}`, selected, added }));
+}
+
+// ---------------------------------------------------------------- keeping phone notifications alive
+
+const validSub = (endpoint, p256dh, auth) =>
+  /^https:\/\/\S{10,1000}$/.test(endpoint) && /^[\w-]{80,100}$/.test(p256dh) && /^[\w-]{16,30}$/.test(auth);
+
+/** The app, opened on a phone that already allowed notifications, re-sends its current push address (silent). */
+export async function pushSync(c) {
+  const f = await c.form();
+  const endpoint = String(f.get("endpoint") || ""), p256dh = String(f.get("p256dh") || ""), auth = String(f.get("auth") || "");
+  if (!validSub(endpoint, p256dh, auth)) return new Response("bad", { status: 400 });
+  const label = String(f.get("label") || "Aparelho").slice(0, 60);
+  await c.db.prepare(
+    "insert into push_subs (id, endpoint, p256dh, auth, label, created_at) values (?,?,?,?,?,?) on conflict(endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth",
+  ).bind(newId(), endpoint, p256dh, auth, label, nowIso()).run();
+  return new Response(null, { status: 204 });
+}
+
+/** Apple/Google rotated the address: the service worker sends old + new. Only a known old address can be replaced. */
+export async function pushRenew(c) {
+  let d = {};
+  try { d = await c.req.json(); } catch { return new Response("bad", { status: 400 }); }
+  const old = String(d.old || ""), sub = d.sub || {};
+  const endpoint = String(sub.endpoint || ""), p256dh = String(sub.keys?.p256dh || ""), auth = String(sub.keys?.auth || "");
+  if (!old || !validSub(endpoint, p256dh, auth)) return new Response("bad", { status: 400 });
+  const row = await c.db.prepare("select id from push_subs where endpoint = ?").bind(old).first();
+  if (!row) return new Response("unknown", { status: 404 });
+  await c.db.batch([
+    c.db.prepare("delete from push_subs where endpoint = ? and id <> ?").bind(endpoint, row.id),
+    c.db.prepare("update push_subs set endpoint = ?, p256dh = ?, auth = ? where id = ?").bind(endpoint, p256dh, auth, row.id),
+  ]);
+  return new Response(null, { status: 204 });
 }

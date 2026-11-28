@@ -626,6 +626,17 @@ class E2E(unittest.TestCase):
         box = p.locator(".notify-main")
         expect(box).to_contain_text("iPhone")
         expect(box).to_contain_text("1 aparelho(s)")
+        # Apple/Google rotates the address: the service worker reports old + new, the device stays registered
+        new_sub = {"endpoint": "https://push.example.com/send/rotated999", "keys": {"p256dh": "B" + "C" * 86, "auth": "QkJCQkJCQkJCQkJCQkJCQg"}}
+        r = p.request.post(self.base + "/push/renew", data=json.dumps({"old": fake["endpoint"], "sub": new_sub}), headers={"Content-Type": "application/json"})
+        self.assertEqual(r.status, 204)
+        r = p.request.post(self.base + "/push/renew", data=json.dumps({"old": "https://push.example.com/unknown", "sub": new_sub}), headers={"Content-Type": "application/json"})
+        self.assertEqual(r.status, 404)  # only a known address can be replaced
+        # the app re-sends its current address on open (silent sync): no duplicate
+        r = p.request.post(self.base + "/push/sync", form={"csrf": csrf, "endpoint": new_sub["endpoint"], "p256dh": new_sub["keys"]["p256dh"], "auth": new_sub["keys"]["auth"], "label": "iPhone"})
+        self.assertEqual(r.status, 204)
+        p.goto(self.base + "/integrations")
+        expect(p.locator(".notify-main")).to_contain_text("1 aparelho(s)")
         p.get_by_role("button", name="Testar aviso").click()
         # The fake device's server is not real, so the test may report it; what matters is it tried that device.
         expect(p.get_by_text(re.compile("Aviso de teste enviado|iPhone"))).not_to_have_count(0)

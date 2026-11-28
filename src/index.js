@@ -744,6 +744,7 @@ const PANEL_ROUTES = [
   ["GET", /^\/platforms\/setup$/, TR.platformsSetupPage],
   ["POST", /^\/sales\/([\w-]+)\/delete$/, TR.deleteSale],
   ["POST", /^\/ip-blocks$/, ipBlockPost],
+  ["POST", /^\/push\/sync$/, TR.pushSync],
   ["GET", /^\/settings$/, ST.settingsPage],
   ["POST", /^\/settings\/(currency|refunds|mute|rate|email|antibot)$/, ST.settingsPost],
   ["GET", /^\/settings\/password$/, (c) => ST.passwordPage(c)],
@@ -784,6 +785,8 @@ async function handle(req, env, exec) {
   if (path === "/sw.js") {
     return new Response(ASSETS["sw.js"].body, { headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" } });
   }
+  // The phone's service worker reports a new push address after Apple/Google rotated it (no session there).
+  if (path === "/push/renew" && req.method === "POST") return TR.pushRenew(c);
   let m = path.match(/^\/pb\/([\w-]+)(?:\/([a-z0-9]+))?\/?$/);
   if (m) return TR.postback(c, m[1], m[2] || "other");
   m = path.match(/^\/cost\/([\w-]+)\/google$/);

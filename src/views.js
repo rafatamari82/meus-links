@@ -59,6 +59,7 @@ export function page(c, title, body) {
     html`<a href="${href}" class="nav-item ${active ? "is-current" : ""}" ${active ? raw('aria-current="page"') : ""}>${icon || ""}<span>${label}</span></a>`;
   return html`${head(title, c.assetVersion)}
 <body class="panel">
+<input type="hidden" id="csrf-token" value="${c.csrf}">
 <div class="shell">
   <aside class="sidebar" aria-label="Navegação">
     ${c.section === "results" ? html`<span class="topbar-title" aria-hidden="true">Dashboard</span>` : ""}

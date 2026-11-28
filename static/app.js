@@ -159,6 +159,28 @@
     });
   }
   document.addEventListener("DOMContentLoaded", setupPush);
+
+  // Keep notifications alive: when the app opens on a phone that already allowed them, send the current push
+  // address to the server (Apple sometimes swaps it). Silent; at most once every 6 hours.
+  function syncPush() {
+    var tok = document.getElementById("csrf-token");
+    if (!tok || !("serviceWorker" in navigator) || !("PushManager" in window) || !window.Notification || Notification.permission !== "granted") return;
+    var last = 0;
+    try { last = Number(localStorage.getItem("pushSyncAt") || 0); } catch (e) {}
+    if (Date.now() - last < 6 * 3600 * 1000) return;
+    navigator.serviceWorker.ready.then(function (reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function (sub) {
+      if (!sub) return;
+      var j = sub.toJSON(), body = new URLSearchParams();
+      body.set("csrf", tok.value); body.set("endpoint", j.endpoint); body.set("p256dh", j.keys.p256dh); body.set("auth", j.keys.auth);
+      body.set("label", deviceLabel());
+      return fetch("/push/sync", { method: "POST", body: body, credentials: "same-origin" }).then(function (r) {
+        if (r.ok) { try { localStorage.setItem("pushSyncAt", String(Date.now())); } catch (e) {} }
+      });
+    }).catch(function () {});
+  }
+  document.addEventListener("DOMContentLoaded", syncPush);
   // Open the collapsed box a link points into (e.g. /tracking#google after connecting).
   document.addEventListener("DOMContentLoaded", function () {
     if (!location.hash) return;

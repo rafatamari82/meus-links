@@ -10,6 +10,17 @@ self.addEventListener("push", function (e) {
     tag: d.tag || undefined, data: { url: d.url || "/sales" },
   }));
 });
+// Apple/Google may swap the push address; subscribe again with the same key and tell the server.
+self.addEventListener("pushsubscriptionchange", function (e) {
+  var old = e.oldSubscription;
+  var key = old && old.options && old.options.applicationServerKey;
+  e.waitUntil((e.newSubscription ? Promise.resolve(e.newSubscription)
+    : self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }))
+    .then(function (sub) {
+      return fetch("/push/renew", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ old: old ? old.endpoint : "", sub: sub.toJSON() }) });
+    }).catch(function () {}));
+});
 self.addEventListener("notificationclick", function (e) {
   e.notification.close();
   var url = (e.notification.data && e.notification.data.url) || "/sales";
