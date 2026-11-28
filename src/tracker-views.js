@@ -143,7 +143,7 @@ function perfChart(sr, cur, keep) {
 </section>`;
 }
 
-export function resultsView(c, { s, range, byAd, srcFilter, netFilter = "", prodFilter = "", list, tot, series, hasAny, sources = [], networks = [], products = [], productNames = [], money = {}, lifetimeBrl = 0, audience = { age: [], gender: [] } }) {
+export function resultsView(c, { s, range, byAd, srcFilter, netFilter = "", prodFilter = "", list, tot, series, hasAny, sources = [], networks = [], products = [], productNames = [], money = {}, lifetimeBrl = 0, linkClicks = 0, audience = { age: [], gender: [] } }) {
   const cur = s.currency;
   const m = (x) => (x == null ? "—" : fmtMoney(x, cur));
   const tab = (label, params, on) => html`<a class="tab ${on ? "is-current" : ""}" href="/results?${new URLSearchParams(params)}" ${on ? raw('aria-current="page"') : ""}>${label}</a>`;
@@ -198,7 +198,7 @@ ${empty}
 <div class="m-kpis mobile-only">
   <div class="m-kpi m-kpi-hero"><p class="m-kpi-label">Faturamento</p><p class="m-kpi-value">${m(tot.revenue)}</p></div>
   <div class="m-kpi m-kpi-dark"><p class="m-kpi-label">Vendas</p><p class="m-kpi-value">${tot.sales}</p></div>
-  <div class="m-kpi m-kpi-outline"><p class="m-kpi-label">Reembolsos</p><p class="m-kpi-value">${tot.refunds}</p></div>
+  <div class="m-kpi m-kpi-outline"><p class="m-kpi-label">Cliques</p><p class="m-kpi-value">${linkClicks.toLocaleString("pt-BR")}</p></div>
 </div>
 ${goalCard(lifetimeBrl, c.assetVersion)}
 ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) => html`
@@ -244,7 +244,8 @@ ${networks.length ? html`<div class="net-cards mobile-only">${networks.map((n) =
     ${card("CPA", m(tot.cpa), "Gasto dividido pelo número de vendas.")}
     ${card("ROI", pctTxt(roi), "Lucro dividido pelo gasto.", tone(roi))}
     ${card("Margem", pctTxt(margin), "Lucro dividido pelo faturamento líquido.", tone(margin))}
-    ${card("Cliques", String(tot.clicks), "Cliques nos links rastreados.")}
+    ${card("Cliques nos links", linkClicks.toLocaleString("pt-BR"), "Cliques de pessoas em todos os seus links curtos, sem robôs e sem bloqueados.")}
+    ${card("Cliques rastreados", String(tot.clicks), "Cliques nos links com rastreio de vendas ligado.")}
     ${card("Conversão", pct(tot.trackedSales, tot.clicks), "Vendas rastreadas divididas pelos cliques.")}
     ${card("Vendas reembolsadas", m(money.refunded || 0), "Valor devolvido em reembolsos no período.")}
     ${card("Reembolso", pct(money.refundN || 0, tot.sales), "Reembolsos divididos pelas vendas.")}

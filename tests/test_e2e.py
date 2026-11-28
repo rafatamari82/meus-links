@@ -701,7 +701,7 @@ class E2E(unittest.TestCase):
         expect(kpis).to_be_visible()
         expect(kpis.locator(".m-kpi-hero")).to_contain_text("Faturamento")
         expect(kpis.locator(".m-kpi-dark")).to_contain_text("Vendas")
-        expect(kpis.locator(".m-kpi-outline")).to_contain_text("Reembolsos")
+        expect(kpis.locator(".m-kpi-outline")).to_contain_text("Cliques")
         cards = m.locator(".net-cards.mobile-only .net-card")
         if cards.count():
             expect(cards.first).to_be_visible()

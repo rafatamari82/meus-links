@@ -620,7 +620,7 @@ export async function resultsPage(c) {
   const srcSql = srcFilter ? " and coalesce(k.source, 'none') = ?" : "";
   const cmp = compareWindow(range);
   // Every query goes to the database in one round trip (it is far away, so each trip costs).
-  const [clicks, convs, costs, nameRows, dRows, cRows, hasAnyRows, netRows, linkNets, pRows, prodNameRows, srcRows, demoRows, lifeRows] = (await db.batch([
+  const [clicks, convs, costs, nameRows, dRows, cRows, hasAnyRows, netRows, linkNets, pRows, prodNameRows, srcRows, demoRows, lifeRows, linkClickRows] = (await db.batch([
     db.prepare(
     `select source, coalesce(campaign, '') as campaign${adCol}, count(*) as n from tk_clicks
      where at >= ? and at < ?${netFilter ? " and link_id in (select id from links where network = ?)" : ""} group by source, campaign${adGroup}`,
@@ -661,7 +661,10 @@ export async function resultsPage(c) {
     ).bind(range.from, range.to),
     // lifetime revenue, for the R$ 100 mil goal (no filters)
     db.prepare("select type, currency, sum(amount_cents) as cents from tk_conversions group by type, currency"),
+    // every short link's clicks from people in the period (no robots, nothing blocked), tracked or not
+    db.prepare("select count(*) as n from clicks where at >= ? and at < ? and is_bot = 0 and blocked = 0").bind(range.start, range.end),
   ])).map((r) => r.results || []);
+  const linkClicks = linkClickRows[0]?.n || 0;
   const lifetimeBrl = lifeRows.reduce((a, r) => a + sumRev(r.type, T.convert(r.cents || 0, r.currency, "BRL", s)), 0);
   const audience = { age: new Map(), gender: new Map() };
   if (!srcFilter || srcFilter === "google") {
@@ -759,7 +762,7 @@ export async function resultsPage(c) {
   const productNames = prodNameRows.map((r) => r.product);
   const sources = srcRows.map((r) => r.source);
   if (srcFilter && !sources.includes(srcFilter)) sources.push(srcFilter);
-  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, netFilter, prodFilter, list, tot, series, hasAny, sources, networks, products, productNames, money, lifetimeBrl, audience: { age: [...audience.age.values()], gender: [...audience.gender.values()] } }));
+  return c.respond(TV.resultsView(c.view(), { s, range, byAd, srcFilter, netFilter, prodFilter, list, tot, series, hasAny, sources, networks, products, productNames, money, lifetimeBrl, linkClicks, audience: { age: [...audience.age.values()], gender: [...audience.gender.values()] } }));
 }
 
 export async function salesPage(c) {
