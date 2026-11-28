@@ -44,7 +44,8 @@ function head(title, assetVersion) {
   <meta name="apple-mobile-web-app-title" content="Gringa Ads">
   <link rel="stylesheet" href="/static/tokens.css?v=${assetVersion}">
   <link rel="stylesheet" href="/static/app.css?v=${assetVersion}">
-  <link rel="icon" href="/static/gr-64.png" type="image/png">
+  <link rel="icon" href="/static/gr-fav-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/static/gr-fav-64.png" sizes="64x64" type="image/png">
   <script src="/static/app.js?v=${assetVersion}" defer></script>
 </head>`;
 }
